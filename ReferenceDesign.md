@@ -1,5 +1,18 @@
 # xDAO CATF – Reference Design
 
+**Specification Status:** Stable
+
+**Version:** 1.0
+
+**Release Intent:** Civilization-grade baseline. This version defines the minimum complete, deterministic, and interoperable core of the xDAO CATF protocol.
+
+**Change Policy:**
+
+* Version 1.x MAY receive clarifications and non-semantic editorial fixes.
+* Any semantic change that affects determinism, canonicalization, or resolution MUST increment the major version.
+
+---
+
 This document defines the **reference design** for the Canonical Attestation Text Format (CATF) and its supporting system within xDAO. It is written to be implementable, forkable, and survivable.
 
 ---
@@ -19,6 +32,63 @@ Non-goals:
 * Currency, tokens, or gas
 * Anonymous adversarial consensus
 * Automatic enforcement of truth
+
+---
+
+## 1.1 What Is CATF (Canonical Attestation Text Format)
+
+**CATF (Canonical Attestation Text Format)** is a human-readable, cryptographically verifiable, and canonically serializable text format for recording attestations.
+
+CATF is designed to act as a **civilization-grade evidence substrate**. It preserves *what was asserted*, *by whom*, and *about what*, in a form that can be:
+
+* Verified offline
+* Archived on paper or digital media
+* Reimplemented without reference code
+* Interpreted by humans without schemas
+
+CATF binds **meaning first** and **cryptographic proof second**. Cryptography provides evidence of authorship and integrity; it does not create meaning.
+
+CATF is not a database format or execution layer. It is a durable affidavit format designed to survive institutional collapse, cryptographic migration, and technological discontinuity.
+
+---
+
+## 1.2 What Is xDAO (Extended Distributed Autonomous Organization)
+
+**xDAO** is an **Extended Distributed Autonomous Organization platform**.
+
+Unlike conventional DAOs, which focus on token governance, on-chain execution, and economic coordination, xDAO is designed as a **civilization-grade coordination and memory substrate**.
+
+xDAO extends the DAO concept beyond blockchain execution by separating:
+
+* **Evidence** (what was asserted)
+* **Authority** (who is trusted, under what policy)
+* **Resolution** (how conclusions are derived)
+* **Enforcement** (explicitly external)
+
+xDAO is built on CATF and related protocols to enable organizations to:
+
+* Record durable, cryptographically verifiable statements
+* Preserve disagreement without forced consensus
+* Apply policy-driven trust without global authorities
+* Operate offline, independently, and forkably
+
+xDAO is **not** a blockchain, smart contract platform, or token system.
+
+xDAO **is**:
+
+* A distributed institutional memory
+* A coordination substrate for law, science, and governance
+* A framework for autonomous yet interoperable organizations
+
+xDAO provides autonomy at the organizational layer while remaining **compatible with multiple storage, networking, and execution environments**.
+
+Autonomy in xDAO means:
+
+* No required central operator
+* No mandatory global state
+* No irreversible consensus
+
+xDAO systems coordinate through **evidence, policy, and resolution**, not force or finality.
 
 ---
 
@@ -66,6 +136,50 @@ Names are:
 * Forkable
 
 Names never replace CIDs as authority.
+
+---
+
+## 2.4 CATF Canonical Serialization Rules (Normative)
+
+This section defines the **byte-level canonicalization rules** for CATF. These rules are mandatory to ensure deterministic hashing and signing across independent implementations.
+
+### Canonical Encoding Rules
+
+CATF documents MUST adhere to the following:
+
+1. Encoding MUST be UTF-8
+2. Line endings MUST be LF (`
+   `)
+3. No BOM is permitted
+4. Trailing whitespace on any line is forbidden
+
+### Structural Rules
+
+1. Sections MUST appear in the following order:
+   `META`, `SUBJECT`, `CLAIMS`, `CRYPTO`
+2. Section headers MUST appear alone on a single line
+3. A single blank line MUST separate sections
+
+### Key–Value Rules
+
+1. Keys MUST be ASCII
+2. Keys are case-sensitive
+3. Keys within a section MUST be sorted lexicographically (byte order)
+4. Each key MUST appear only once per section
+5. Key–value pairs MUST be formatted as:
+   `Key: <single-space><Value>`
+
+### Signature Scope
+
+The cryptographic signature MUST cover all bytes from:
+
+`-----BEGIN XDAO ATTESTATION-----`
+
+through the end of the `CLAIMS` section, inclusive.
+
+The `Signature:` line itself MUST NOT be included in the signed material.
+
+---
 
 ---
 
@@ -158,6 +272,29 @@ Trust policy input + attestation graph → resolved view.
 
 ---
 
+## 5.1 Name Resolution Rules (Normative)
+
+Resolvers MUST resolve symbolic names deterministically according to the following rules:
+
+1. Collect all `name-binding` attestations for the requested name
+2. Exclude invalid or revoked name-binding attestations
+3. Construct a supersession DAG among name-bindings
+4. If a single non-superseded binding exists, it is selected
+5. If multiple non-superseded bindings exist, a **name fork** is declared
+6. Name forks MUST be surfaced explicitly to the caller
+
+Version strings have no intrinsic ordering semantics and are advisory only.
+
+Resolvers MUST NOT:
+
+* Implicitly choose a name binding without policy
+* Infer time-based precedence
+* Hide name forks
+
+---
+
+---
+
 ## 6. Resolver Algorithm (Deterministic)
 
 Given:
@@ -237,13 +374,317 @@ Reference implementations SHOULD:
 
 ---
 
-## 12. Locked Principles
+## 12. CATF Guardrails (Normative)
 
-* CATF is canonical
-* CIDs are authority
-* Names are convenience
-* Forks are truth
-* Resolution is policy
+This section defines the **non-negotiable guardrails** for CATF.
+These are **normative requirements** (`MUST / MUST NOT`) that ensure CATF remains verifiable, intelligible, and reconstructable across centuries, technological collapse, and institutional failure.
+
+If any of these guardrails are violated, CATF **ceases to be civilization-grade**.
+
+---
+
+### I. Canonical Authority Guardrails
+
+#### G1 — CATF Is the Canonical Truth
+
+**MUST**
+
+* CATF is the authoritative, canonical representation of an attestation.
+* Any other representation (JSON, CBOR, YAML, database rows, APIs) is a *projection*.
+
+**MUST NOT**
+
+* No system may claim validity that cannot be derived from CATF.
+* No signature may apply only to a non-CATF representation.
+
+**Rationale:**
+Truth must not depend on tooling.
+
+---
+
+#### G2 — Hashes and Signatures Bind CATF, Not Projections
+
+**MUST**
+
+* Cryptographic hashes and signatures MUST be computed over the canonical CATF byte sequence.
+* CATF canonicalization rules MUST produce identical bytes across independent implementations.
+
+**MUST NOT**
+
+* No signing of “equivalent JSON”
+* No signing of internal object models
+
+**Rationale:**
+Independent civilizations must converge on the same bytes.
+
+---
+
+### II. Human Survivability Guardrails
+
+#### G3 — Human-Legible Without External References
+
+**MUST**
+
+* Every CATF document MUST be semantically understandable by a literate human without schemas, URLs, or software.
+
+**MUST NOT**
+
+* No required external schema
+* No required network access
+* No opaque binary blobs in semantic sections
+
+**Rationale:**
+Meaning must survive machine loss.
+
+---
+
+#### G4 — Print-Safe and Transcribable
+
+**MUST**
+
+* CATF MUST be representable entirely as plain text.
+* Errors MUST degrade locally (line-level), not globally.
+
+**MUST NOT**
+
+* No indentation-sensitive meaning
+* No whitespace-depth semantics
+* No escaping rules that conceal content
+
+**Rationale:**
+CATF must survive paper, OCR, and manual transcription.
+
+---
+
+### III. Structural Guardrails
+
+#### G5 — Explicitness Over Convenience
+
+**MUST**
+
+* All semantics MUST be explicit key–value pairs.
+* No implicit defaults.
+* No inferred meaning from omission.
+
+**MUST NOT**
+
+* No positional semantics
+* No schema-defined hidden behavior
+
+**Rationale:**
+Implicit meaning is the first casualty of civilizational decay.
+
+---
+
+#### G6 — Deterministic Ordering Is Mandatory
+
+**MUST**
+
+* Section order is fixed.
+* Key ordering within sections is fixed and specified.
+* Canonical spacing and line endings are fixed.
+
+**MUST NOT**
+
+* No implementation-defined ordering
+* No locale-dependent formatting
+
+**Rationale:**
+Canonical truth requires canonical bytes.
+
+---
+
+### IV. Cryptographic Guardrails
+
+#### G7 — Cryptography Is Evidence, Not Meaning
+
+**MUST**
+
+* Cryptographic material MUST be isolated in a `CRYPTO` section.
+* Loss or deprecation of cryptography MUST NOT erase semantic meaning.
+
+**MUST NOT**
+
+* No semantic claims encoded only in cryptographic structures
+* No “magic meaning” derived from algorithms
+
+**Rationale:**
+Crypto ages. Meaning must not.
+
+---
+
+#### G8 — Cryptographic Agility Is Mandatory
+
+**MUST**
+
+* CATF MUST support re-attestation and cross-signing.
+* CATF MUST allow multiple attestations over the same subject.
+
+**MUST NOT**
+
+* No assumption of permanent algorithms
+* No single-signature finality model
+
+**Rationale:**
+Civilizations outlive cryptosystems.
+
+---
+
+### V. Identity & Authority Guardrails
+
+#### G9 — No Global Root of Authority
+
+**MUST**
+
+* CATF MUST NOT depend on any global registry, root key, or centralized authority.
+
+**MUST NOT**
+
+* No ICANN-like root
+* No hardcoded trust anchors
+
+**Rationale:**
+Global roots are political failure points.
+
+---
+
+#### G10 — Authority Is Always Explicit
+
+**MUST**
+
+* Every attestation MUST explicitly state its issuer identity.
+* Trust decisions MUST be external to CATF (policy-based).
+
+**MUST NOT**
+
+* No implied authority
+* No default trust assumptions
+
+**Rationale:**
+Authority is contextual, not universal.
+
+---
+
+### VI. Fork & Conflict Guardrails
+
+#### G11 — Forks Are First-Class and Preserved
+
+**MUST**
+
+* CATF MUST allow multiple valid, conflicting attestations to coexist.
+
+**MUST NOT**
+
+* No silent overwrites
+* No forced convergence
+
+**Rationale:**
+Civilizations disagree. Systems must remember that.
+
+---
+
+#### G12 — Resolution Is External and Recomputable
+
+**MUST**
+
+* CATF MUST NOT encode final resolution logic.
+* Resolution MUST be a deterministic function of:
+
+  * attestations
+  * trust policy
+  * optional context (time, jurisdiction, role)
+
+**MUST NOT**
+
+* No embedded consensus outcomes
+* No irreversible “final state”
+
+**Rationale:**
+Truth evolves as evidence accumulates.
+
+---
+
+### VII. Naming & Discovery Guardrails
+
+#### G13 — Names Are Advisory, Never Authoritative
+
+**MUST**
+
+* Symbolic names MUST resolve to CIDs via attestations.
+* CIDs remain the ultimate authority.
+
+**MUST NOT**
+
+* No name-only references
+* No name-based truth claims
+
+**Rationale:**
+Names rot. Hashes endure.
+
+---
+
+#### G14 — Name Records Are Attestations
+
+**MUST**
+
+* All name bindings MUST themselves be CATF attestations.
+* Name supersession MUST be explicit.
+
+**MUST NOT**
+
+* No implicit TTL
+* No mutable registries without attestations
+
+**Rationale:**
+Discovery must be auditable.
+
+---
+
+### VIII. Dependency Guardrails
+
+#### G15 — CATF Is Self-Describing
+
+**MUST**
+
+* The CATF specification itself MUST be archivable as plain text.
+* A future implementer MUST be able to reconstruct the system from the spec alone.
+
+**MUST NOT**
+
+* No reliance on living websites
+* No “see online documentation” dependencies
+
+**Rationale:**
+Specifications must survive their creators.
+
+---
+
+### IX. Foundational Principle
+
+> **CATF is designed to preserve evidence, not enforce truth.**
+> **Enforcement belongs to people, institutions, and policy.**
+
+If CATF ever attempts to *decide*, it will fail to *survive*.
+
+---
+
+### Summary
+
+CATF is **not**:
+
+* A database format
+* A blockchain clone
+* A SaaS schema
+
+CATF **is**:
+
+* A durable truth substrate
+* A cryptographic affidavit system
+* A civilization-grade memory primitive
+
+These guardrails are locked. All future design must comply with them.
+
+---
 
 ---
 
