@@ -408,12 +408,197 @@ Resolvers MUST NOT:
 
 ---
 
-## 15. Future Extensions
+## 15. Formal Verification of Resolver Determinism
 
-Planned extensions:
+This section defines the **Formal Determinism Guarantee** for xDAO resolvers. It specifies the conditions, invariants, and proof obligations required to ensure that independent resolver implementations always converge on identical outputs.
 
-* Trust Policy DSL
-* Confidence scoring models
-* Jurisdiction-specific resolution modules
-* UX standards for fork presentation
-* Formal verification of resolver determinism
+---
+
+## 15.1 Determinism Statement
+
+**Given**:
+
+* An identical finite set of valid CATF attestations `A`
+* An identical trust policy `P`
+* An identical resolution context `C`
+
+**Then**:
+All compliant resolvers MUST produce an identical resolved output `R`.
+
+Formally:
+
+```
+∀ r1, r2 ∈ Resolvers,
+Resolve(r1, A, P, C) = Resolve(r2, A, P, C)
+```
+
+---
+
+## 15.2 Resolver as a Pure Function
+
+A resolver MUST behave as a **pure function**:
+
+```
+Resolve : (A, P, C) → R
+```
+
+Where:
+
+* `A` is unordered
+* `P` is immutable for the resolution
+* `C` is explicitly supplied
+
+Resolvers MUST NOT:
+
+* Depend on wall-clock time
+* Depend on network state
+* Depend on iteration order of inputs
+* Depend on implementation-specific defaults
+
+---
+
+## 15.3 Input Normalization Invariants
+
+Resolvers MUST enforce the following normalization invariants:
+
+1. All CATF documents are canonicalized before processing
+2. Invalid or unverifiable attestations are deterministically excluded
+3. Attestation identity is defined solely by its CID
+
+These steps guarantee a stable, ordered input domain.
+
+---
+
+## 15.4 Graph Construction Determinism
+
+The attestation DAG MUST be constructed deterministically:
+
+* Nodes sorted lexicographically by CID
+* Edges derived only from explicit references (`Supersedes`, `Parents`)
+* No inferred or implicit edges allowed
+
+Graph construction MUST yield an identical structure across implementations.
+
+---
+
+## 15.5 Revocation Evaluation Determinism
+
+Revocation processing MUST satisfy:
+
+* Revocation targets identified by CID
+* Revocation validity evaluated strictly by trust policy `P`
+* No ordering dependence between revocations
+
+Revocation outcome for each attestation MUST be binary and deterministic.
+
+---
+
+## 15.6 Trust Evaluation Determinism
+
+Trust evaluation MUST be:
+
+* Rule-based
+* Explicit
+* Side-effect free
+
+For any attestation `a ∈ A`:
+
+```
+Trusted(a) ∈ {true, false}
+```
+
+Trust evaluation MUST NOT:
+
+* Use probabilistic rules
+* Use heuristics
+* Depend on resolution order
+
+---
+
+## 15.7 Fork Detection Invariants
+
+Fork detection MUST be deterministic:
+
+* Conflict defined only by incompatible trusted claims
+* Fork membership determined solely by DAG topology and claim semantics
+
+Resolvers MUST produce identical fork sets for identical inputs.
+
+---
+
+## 15.8 Resolution Selection Rules
+
+Where policy permits selection, resolvers MAY apply deterministic tie-breakers:
+
+* Explicit supersession edges
+* Fixed quorum weights
+* Lexicographic ordering of CIDs
+
+All such rules MUST be:
+
+* Fully specified
+* Deterministic
+* Documented
+
+---
+
+## 15.9 Output Canonicalization
+
+Resolver outputs MUST be canonicalized:
+
+* Fixed field ordering
+* Stable data structures
+* Explicit representation of forks and exclusions
+
+Two compliant resolvers MUST produce byte-identical output representations when serialized canonically.
+
+---
+
+## 15.10 Proof Obligations for Implementations
+
+Each resolver implementation MUST demonstrate:
+
+1. Pure-function behavior
+2. Deterministic input handling
+3. Deterministic graph construction
+4. Deterministic trust evaluation
+5. Deterministic output generation
+
+Formal methods MAY include:
+
+* Property-based testing
+* Model checking
+* Reference test vectors
+* Cross-implementation comparison
+
+---
+
+## 15.11 Non-Determinism Prohibitions
+
+Resolvers MUST NOT:
+
+* Use randomization
+* Use concurrency without deterministic reduction
+* Use unordered data structures without explicit ordering
+* Depend on external mutable state
+
+Any such behavior violates compliance.
+
+---
+
+## 15.12 Determinism as a Compliance Requirement
+
+Resolver determinism is a **hard compliance requirement**.
+
+Non-deterministic resolvers:
+
+* Are non-compliant
+* Must not claim xDAO compatibility
+
+---
+
+## 16. Final Statement
+
+> **Determinism is the foundation of trust without authority.**
+
+If independent resolvers cannot converge, the system has failed — regardless of cryptography, distribution, or intent.
