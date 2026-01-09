@@ -247,14 +247,173 @@ Reference implementations SHOULD:
 
 ---
 
-## 13. Next Design Stages
+## 13. Deterministic Resolver Contract (DRC)
+
+This section defines the **Deterministic Resolver Contract (DRC)**. The DRC specifies how an xDAO resolver MUST process attestations to produce a resolved view. Given the same inputs and policy, all compliant resolvers MUST produce identical results.
+
+---
+
+## 13.1 Resolver Inputs
+
+A resolver operates over the following explicit inputs:
+
+1. **Attestation Set**
+
+   * A finite set of CATF attestations
+   * Each attestation independently verifiable
+
+2. **Trust Policy**
+
+   * A policy definition external to CATF
+   * Specifies trusted issuers, roles, quorum rules, and jurisdictional constraints
+
+3. **Resolution Context (Optional)**
+
+   * Time of evaluation
+   * Jurisdiction
+   * Application-specific role expectations
+
+Resolvers MUST treat missing optional context as undefined, not defaulted.
+
+---
+
+## 13.2 Normalization Phase
+
+Resolvers MUST:
+
+1. Parse CATF documents
+2. Apply canonicalization rules
+3. Reject attestations that fail canonicalization
+4. Verify cryptographic signatures
+
+Invalid attestations MUST be excluded from further processing but MUST be reported.
+
+---
+
+## 13.3 Graph Construction Phase
+
+Resolvers MUST construct a directed acyclic graph (DAG):
+
+* Nodes: attestations
+* Edges: `Supersedes`, `Parents`, or equivalent causal references
+
+Multiple roots and branches are expected and valid.
+
+---
+
+## 13.4 Revocation Processing
+
+Resolvers MUST:
+
+1. Identify all revocation attestations
+2. Determine revocation validity via trust policy
+3. Mark revoked attestations as inactive
+
+Revocation affects trust, not historical existence.
+
+---
+
+## 13.5 Trust Evaluation Phase
+
+Resolvers MUST evaluate attestations against the trust policy:
+
+* Issuer authorization
+* Required roles present
+* Quorum or multi-signature conditions
+* Jurisdictional validity
+
+Attestations failing trust evaluation are retained but marked **untrusted**.
+
+---
+
+## 13.6 Fork Detection
+
+A **fork** exists when:
+
+* Two or more trusted attestations make incompatible claims
+* Neither supersedes the other
+
+Resolvers MUST:
+
+* Preserve all forks
+* Never auto-resolve forks without explicit policy
+
+---
+
+## 13.7 Resolution Output States
+
+Resolvers MUST produce one of the following states per subject:
+
+* **Resolved** – Single trusted attestation path
+* **Forked** – Multiple trusted conflicting paths
+* **Unresolved** – Insufficient trusted attestations
+* **Revoked** – All trusted attestations revoked
+
+---
+
+## 13.8 Deterministic Selection Rules
+
+Where policy allows selection, resolvers MAY use deterministic tie-breakers such as:
+
+* Explicit supersession
+* Quorum weight
+* Monotonic counters
+
+Resolvers MUST document any such rules.
+
+---
+
+## 13.9 Resolver Output Contract
+
+Resolver output MUST include:
+
+* Resolved state
+* List of supporting attestations (CIDs)
+* List of forks (if any)
+* Confidence indicators (optional)
+* Excluded or invalid attestations
+
+---
+
+## 13.10 Determinism Guarantee
+
+Given:
+
+* Identical attestation sets
+* Identical trust policies
+* Identical resolution context
+
+All compliant resolvers MUST produce identical outputs.
+
+---
+
+## 13.11 Non-Goals of the Resolver
+
+Resolvers MUST NOT:
+
+* Enforce real-world actions
+* Hide forks
+* Mutate attestations
+* Assume global time
+
+---
+
+## 14. Locked Principles (Reaffirmed)
+
+* CATF is canonical
+* CIDs are authority
+* Names are convenience
+* Forks are truth
+* Resolution is policy
+
+---
+
+## 15. Future Extensions
 
 Planned extensions:
 
 * Trust Policy DSL
-* Jurisdiction modules
-* Schema registries (CID-addressed)
-* Resolver UX standards
-* Long-term archive profiles
-
-This document defines the **foundation**. All extensions MUST comply.
+* Confidence scoring models
+* Jurisdiction-specific resolution modules
+* UX standards for fork presentation
+* Formal verification of resolver determinism
