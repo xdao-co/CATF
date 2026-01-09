@@ -1,0 +1,4 @@
+xDAO Example Whitepaper
+
+This is a placeholder document used by the CLI examples.
+It exists purely to produce a stable subject CID via sha256(raw bytes).

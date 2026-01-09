@@ -1,0 +1,4 @@
+xDAO Example Purchase Agreement
+
+This is a placeholder purchase agreement used by the real-estate use case.
+It exists purely to produce a stable subject CID via sha256(raw bytes).

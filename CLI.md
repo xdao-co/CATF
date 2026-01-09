@@ -1,0 +1,190 @@
+# xdao-catf CLI How-To (Minimum Reference CLI)
+
+This repository includes a small CLI (`xdao-catf`) to exercise the system end-to-end:
+
+- Generate/store Ed25519 keys locally (KMS-lite)
+- Produce canonical CATF attestations
+- Evaluate attestations under a TPDL trust policy
+- Output canonical CROF resolutions
+
+## Where the CLI lives
+
+Build the CLI binary from the repo root:
+
+```sh
+make build
+./bin/xdao-catf --help
+```
+
+For development, you can also run it from the Go module folder (`./src`) using `go run`:
+
+```sh
+cd ./src
+go run ./cmd/xdao-catf --help
+```
+
+## Commands
+
+### `doc-cid`
+
+Computes a stable subject CID for a file (CIDv1 `raw` + sha2-256 multihash):
+
+```sh
+SUBJECT_CID="$(./bin/xdao-catf doc-cid ./examples/whitepaper.txt)"
+```
+
+For development via `go run`:
+
+```sh
+cd ./src
+SUBJECT_CID="$(go run ./cmd/xdao-catf doc-cid ../examples/whitepaper.txt)"
+```
+
+### `ipfs put` (local publish, no daemon required)
+
+`doc-cid` only computes the CID; it does not store bytes anywhere.
+
+If you have the Kubo `ipfs` CLI installed, you can store the file bytes into your **local IPFS repo** (even if `ipfs daemon` is not running) as a **raw block** so the returned CID matches `doc-cid`:
+
+```sh
+SUBJECT_CID="$(./bin/xdao-catf ipfs put --init ./examples/whitepaper.txt)"
+```
+
+Notes:
+
+- This uses `ipfs block put` under the hood (raw block, sha2-256). It is meant for “content-address the exact bytes” workflows.
+- If you want “normal IPFS files” (UnixFS DAG with chunking), that’s `ipfs add`, which will usually produce a different CID than `doc-cid`.
+- To actually serve the content to other peers, you’ll later run `ipfs daemon` (or have your XDAO Node serve/pin content).
+
+#### How to test IPFS from the CLI
+
+This is a quick smoke test that proves:
+
+1) the CID matches `doc-cid`, and
+2) the bytes are actually stored in your local IPFS repo.
+
+From the repo root (after `make build`):
+
+```sh
+CID="$(./bin/xdao-catf ipfs put --init ./examples/whitepaper.txt)"
+echo "CID=$CID"
+
+./bin/xdao-catf doc-cid ./examples/whitepaper.txt  # should match
+
+ipfs block stat "$CID"
+ipfs block get "$CID" > /tmp/xdao-ipfs.out
+cmp ./examples/whitepaper.txt /tmp/xdao-ipfs.out
+echo "OK: local IPFS repo contains the exact bytes"
+```
+
+If you want to publish to the IPFS network (peers can fetch), run your node in daemon mode:
+
+```sh
+ipfs daemon
+```
+
+Then ensure the content is pinned/served by that node (or by your XDAO Node’s pinning layer).
+
+### `key` (KMS-lite)
+
+Keys are stored under `~/.xdao/keys/<name>/` as seed files (hex) with `0600` permissions.
+
+Create a root key:
+
+```sh
+./bin/xdao-catf key init --name alice
+```
+
+Create a deterministic root key (useful for reproducible demos):
+
+```sh
+./bin/xdao-catf key init --name alice --seed-hex 000102...1e1f
+```
+
+Derive a role key:
+
+```sh
+./bin/xdao-catf key derive --from alice --role author
+```
+
+List keys:
+
+```sh
+./bin/xdao-catf key list
+```
+
+Export a public key (for TPDL `TRUST` entries):
+
+```sh
+./bin/xdao-catf key export --name alice --role author
+```
+
+Dev note: all of the above can also be run via `go run` from `./src`.
+
+### `attest`
+
+Generates a canonical CATF attestation and prints it to stdout (no trailing newline).
+
+Sign with a stored key:
+
+```sh
+./bin/xdao-catf attest \
+  --subject "$SUBJECT_CID" \
+  --description "Example" \
+  --signer alice \
+  --signer-role author \
+  --type authorship \
+  --role author \
+  > /tmp/a1.catf
+```
+
+Sign with an explicit seed (demo-only fallback):
+
+```sh
+./bin/xdao-catf attest \
+  --subject "$SUBJECT_CID" \
+  --description "Example" \
+  --seed-hex 000102...1e1f \
+  --type authorship \
+  --role author \
+  > /tmp/a1.catf
+```
+
+Notes:
+
+- `Type=approval` requires `Effective-Date`; if omitted, the CLI fills it with `time.Now().UTC()` in RFC3339.
+- `Type=revocation` targets a prior attestation CID via `--target-attestation <AttestationCID>`.
+- `Type=supersedes` links to a prior attestation CID via `--supersedes <AttestationCID>`.
+
+### `resolve`
+
+Resolves a subject CID under a policy and prints canonical CROF:
+
+```sh
+./bin/xdao-catf resolve --subject "$SUBJECT_CID" --policy ./policy.tpdl --att /tmp/a1.catf
+```
+
+### `resolve-name`
+
+Resolves name-bindings under policy:
+
+```sh
+./bin/xdao-catf resolve-name --name example.com --version v1 --policy ./policy.tpdl --att /tmp/n1.catf
+```
+
+## End-to-end examples
+
+Run the provided scripts from the repo root:
+
+```sh
+./examples/usecase1_document_publishing.sh
+./examples/usecase3_science_quorum.sh
+```
+
+To run the examples with subjects stored in a local IPFS repo (no daemon required):
+
+```sh
+make examples-ipfs
+```
+
+See `UseCases.md` for the higher-level workflows these scripts correspond to.

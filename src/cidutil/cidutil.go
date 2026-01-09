@@ -1,0 +1,18 @@
+package cidutil
+
+import (
+	"github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multihash"
+)
+
+// CIDv1RawSHA256 returns an IPFS-compatible CIDv1 string using the "raw" multicodec
+// and a sha2-256 multihash.
+func CIDv1RawSHA256(data []byte) string {
+	sum, err := multihash.Sum(data, multihash.SHA2_256, -1)
+	if err != nil {
+		// multihash.Sum only errors for invalid inputs; with SHA2_256 and -1 length,
+		// this should be unreachable.
+		return ""
+	}
+	return cid.NewCidV1(cid.Raw, sum).String()
+}
