@@ -1000,3 +1000,192 @@ CROF MUST NOT:
 > **CROF records what was believed — and why.**
 
 CROF is the memory of interpretation, preserved honestly for the future.
+
+## 19. Reference Test Vectors
+
+This section defines **normative reference test vectors**. These vectors are authoritative examples that resolver implementations MUST pass to claim xDAO compatibility.
+
+Each vector consists of:
+
+* Input CATF attestations
+* A Trust Policy (TPDL)
+* Expected CROF output (canonical summary)
+
+Test vectors are intentionally small, explicit, and boring.
+
+---
+
+### 19.1 Test Vector 1 — Single-Author Document (No Forks)
+
+**Scenario**: A single author publishes a document. No conflicts exist.
+
+#### Document
+
+* CID: `bafy-doc-1`
+
+#### CATF Attestation A1 (Authorship)
+
+```
+-----BEGIN XDAO ATTESTATION-----
+META
+Version: 1
+Spec: xdao-catf-1
+
+SUBJECT
+CID: bafy-doc-1
+Description: Scientific paper draft
+
+CLAIMS
+Type: authorship
+Role: author
+
+CRYPTO
+Issuer-Key: ed25519:AUTHOR_KEY
+Signature-Alg: ed25519
+Hash-Alg: sha256
+Signature: SIG_A1
+-----END XDAO ATTESTATION-----
+```
+
+#### Trust Policy
+
+```
+-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+Spec: xdao-tpdl-1
+
+TRUST
+Key: ed25519:AUTHOR_KEY
+Role: author
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+-----END XDAO TRUST POLICY-----
+```
+
+#### Expected CROF Summary
+
+* State: `Resolved`
+* Paths: 1
+* Forks: 0
+* Exclusions: 0
+
+---
+
+### 19.2 Test Vector 2 — Competing Revisions (Forked)
+
+**Scenario**: Two trusted authors publish competing revisions without supersession.
+
+#### CATF Attestations
+
+* A1: Authorship by AUTHOR_A
+* A2: Authorship by AUTHOR_B
+
+Both reference the same parent document.
+
+#### Trust Policy
+
+* AUTHOR_A and AUTHOR_B trusted as authors
+
+#### Expected CROF Summary
+
+* State: `Forked`
+* Paths: 2
+* Forks: 1
+
+Resolvers MUST NOT auto-select a winner.
+
+---
+
+### 19.3 Test Vector 3 — Explicit Supersession
+
+**Scenario**: A later revision explicitly supersedes an earlier one.
+
+#### CATF Attestations
+
+* A1: Authorship (v1)
+* A2: Supersedes A1 (v2)
+
+#### Trust Policy
+
+* Author trusted
+
+#### Expected CROF Summary
+
+* State: `Resolved`
+* Primary Path: A2 → A1
+* Forks: 0
+
+---
+
+### 19.4 Test Vector 4 — Real Estate Multi-Party Approval
+
+**Scenario**: Buyer and Seller must both approve a contract.
+
+#### CATF Attestations
+
+* A1: Approval by Buyer
+* A2: Approval by Seller
+
+#### Trust Policy
+
+```
+Require:
+  Type: approval
+  Role: buyer
+Require:
+  Type: approval
+  Role: seller
+```
+
+#### Expected CROF Summary
+
+* State: `Resolved`
+* Confidence: High
+
+---
+
+### 19.5 Test Vector 5 — Missing Required Party
+
+**Scenario**: Buyer approves, Seller does not.
+
+#### Expected CROF Summary
+
+* State: `Unresolved`
+* Reason: Insufficient trusted attestations
+
+---
+
+### 19.6 Test Vector 6 — Revocation
+
+**Scenario**: An approval is later revoked.
+
+#### CATF Attestations
+
+* A1: Approval by Buyer
+* A2: Revocation of A1 by Buyer
+
+#### Expected CROF Summary
+
+* State: `Revoked`
+* Active Paths: 0
+
+---
+
+### 19.7 Compliance Requirement
+
+Resolver implementations MUST:
+
+* Reproduce the expected CROF state for each test vector
+* Preserve forks exactly where specified
+* Fail deterministically on deviation
+
+Additional test vectors MAY be added over time. Existing vectors MUST remain valid.
+
+---
+
+> **Reference test vectors are the living constitution of the protocol.**
+> They ensure the future cannot quietly rewrite the past.
