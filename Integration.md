@@ -1,0 +1,316 @@
+# Integration Guide (External Projects)
+
+This repo provides:
+
+- **CATF** (Canonical Attestation Text Format): canonical, signed attestations over a subject CID
+- **TPDL** (Trust Policy Definition Language): policies that define *who is trusted* and *what is required*
+- **Resolver**: evaluates attestations under a policy and emits **CROF** (Canonical Resolution Output Format)
+
+This document explains what an external project needs to define (roles, policies, key model, and subject CIDs) and how to integrate either via the CLI or directly via Go packages.
+
+---
+
+## Mental model
+
+An integration has four core artifacts:
+
+1) **Subject bytes**: your document/data (e.g. PDF, JSON export, public key file)
+2) **Subject CID**: a stable content-addressed identifier derived from those bytes
+3) **Attestations (CATF)**: statements about the subject, signed by issuer keys
+4) **Trust policy (TPDL)**: declares which keys are trusted for which roles, and which attestations are required
+
+Resolution is deterministic:
+
+- Inputs: `policy bytes` + `attestation bytes[]` + `subject CID`
+- Output: CROF resolution state + paths/forks/exclusions
+
+---
+
+## 1) Define your subject canonicalization (what exactly is hashed)
+
+Your project must be explicit about what bytes are hashed/published to produce the **subject CID**.
+
+Typical choices:
+
+- **File bytes as-is** (simple): hash the PDF/text/JSON file bytes exactly
+- **Canonical export** (recommended for structured data): define a deterministic serialization (stable JSON, stable CSV, etc.) and hash that
+
+### CID computation (hash-only)
+
+Use `doc-cid` to compute a stable CID for bytes:
+
+```sh
+./bin/xdao-catf doc-cid ./path/to/subject.bin
+```
+
+This only computes the CID; it does not store bytes anywhere.
+
+### Store bytes in local IPFS repo (no daemon required)
+
+If you want to also store bytes locally in your node’s IPFS repo:
+
+```sh
+./bin/xdao-catf ipfs put --init ./path/to/subject.bin
+```
+
+This writes the raw block to the local IPFS repo (via `ipfs block put`) and prints the CID.
+
+### Publish to the IPFS network
+
+If you intend other peers to fetch the content, you need a network-facing node (or pinning layer). Concretely:
+
+- Install Kubo `ipfs`
+- Run the node in daemon mode: `ipfs daemon`
+- Ensure content is pinned/served by that node (or an XDAO Node service)
+
+---
+
+## 2) Define role vocabulary (your contract with policy)
+
+Roles are **policy-level labels** used to interpret issuer keys and attestations.
+
+Your external project should define a small role vocabulary and use it consistently in:
+
+- `TRUST` entries (which key can act in which role)
+- `CLAIMS` (what role the attestation is asserting)
+- `RULES` requirements (what roles/types are required for resolution)
+
+Examples:
+
+- Document workflows: `author`, `reviewer`, `publisher`
+- AI workflows: `ai-reviewer`
+- Real estate: `buyer`, `seller`, `escrow-agent`, `notary`
+- Name registry: `registrar`
+
+Guidelines:
+
+- Keep role names stable (policy depends on them).
+- Prefer a small set of roles; encode nuances in additional claims if needed.
+- If you need scope, use conventions (e.g. `reviewer:medical`, `reviewer:legal`) and treat that as part of the role string.
+
+---
+
+## 3) Define claim types you will use
+
+The resolver evaluates attestations primarily via their claims.
+
+Common core types (v1 patterns used by the examples/CLI):
+
+- `Type=authorship` — asserts authorship / provenance
+- `Type=approval` — asserts approval / acceptance (often gated by policy)
+- `Type=revocation` — invalidates a prior attestation via `Target-Attestation=<CID>`
+- `Type=supersedes` — links to prior via `Supersedes=<CID>` (revision chain)
+- `Type=name-binding` — binds `Name + Version -> Points-To`
+
+Typical required claims by type:
+
+- `authorship`: `Role`
+- `approval`: `Role`, and usually `Effective-Date` (the CLI fills it if omitted)
+- `revocation`: `Target-Attestation`
+- `supersedes`: `Supersedes`
+- `name-binding`: `Name`, `Version`, `Points-To`
+
+Project-specific claims are allowed (e.g. `Comment=...`, `Funds=...`). They will not affect resolution unless you later add policy semantics that interpret them.
+
+---
+
+## 4) Choose your key model (how you issue and trust keys)
+
+You need issuer keys to sign CATF attestations. Policies reference issuer **public keys**.
+
+### Option A: KMS-lite (local-first)
+
+This repo includes a minimal local key store (good for pilots and offline workflows):
+
+```sh
+./bin/xdao-catf key init --name alice
+./bin/xdao-catf key derive --from alice --role author
+./bin/xdao-catf key export --name alice --role author   # prints ed25519:<base64>
+```
+
+Pattern:
+
+- Root key = identity
+- Derived role keys = operational separation (rotate/revoke per role)
+
+### Option B: Bring-your-own signing
+
+If your project already has keys (HSM, Vault, wallet, etc.), you can:
+
+- Publish issuer public keys in `TRUST` as `ed25519:<base64>`
+- Produce valid CATF attestations using the Go packages (or extend CLI integration)
+
+---
+
+## 5) Author policies (TPDL)
+
+A TPDL policy has:
+
+- `TRUST`: (Issuer public key → role)
+- `RULES`: what must be satisfied for resolution
+
+Minimal template:
+
+```text
+-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+Spec: xdao-tpdl-1
+
+TRUST
+Key: ed25519:BASE64PUBKEY_1
+Role: author
+
+Key: ed25519:BASE64PUBKEY_2
+Role: reviewer
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+
+Require:
+  Type: approval
+  Role: reviewer
+-----END XDAO TRUST POLICY-----
+```
+
+Quorum example:
+
+```text
+Require:
+  Type: approval
+  Role: ai-reviewer
+  Quorum: 2
+```
+
+Practical guidance:
+
+- Treat policies as versioned configuration artifacts.
+- In production, generate policies from your application state (users/organizations/registrars) rather than hand-editing.
+- Keep the policy text canonical/stable so it can be content-addressed and audited.
+
+---
+
+## 6) Produce attestations (CATF)
+
+Your app can produce CATF using the CLI (easy) or Go packages (tight integration).
+
+### CLI (reference)
+
+```sh
+./bin/xdao-catf attest \
+  --subject "$SUBJECT_CID" \
+  --description "Purchase agreement" \
+  --signer buyer \
+  --signer-role buyer \
+  --type approval \
+  --role buyer \
+  --claim 'Good-Faith-Money=$10,000 deposited' \
+  > /tmp/buyer.catf
+```
+
+### Go integration (recommended for applications)
+
+At a high level:
+
+1) Build a `catf.Document`
+2) Render it canonically
+3) Parse to get the canonical signing scope (`parsed.Signed`)
+4) Compute the signature and render final bytes
+
+Sketch:
+
+```go
+// Pseudocode sketch: see packages in ./src for exact APIs.
+doc := catf.Document{ /* Meta, Subject, Claims, Crypto */ }
+pre, _ := catf.Render(doc)
+parsed, _ := catf.Parse(pre)
+
+// signature should be computed over parsed.Signed
+sig := catf.SignEd25519SHA256(parsed.Signed, priv)
+
+doc.Crypto["Signature"] = sig
+finalBytes, _ := catf.Render(doc)
+```
+
+Operational guidance:
+
+- Store the final CATF bytes exactly (they are canonical; do not add a trailing newline).
+- Track the Attestation CID (`catf.Parse(finalBytes).CID()`) as the stable identifier.
+
+---
+
+## 7) Resolve (evaluate under policy)
+
+Resolution can run:
+
+- On-demand (API endpoint: “is this document resolved?”)
+- As a job (index attestations, recompute resolutions)
+- As part of a node (XDAO Node continuously evaluates policy state)
+
+CLI:
+
+```sh
+./bin/xdao-catf resolve \
+  --subject "$SUBJECT_CID" \
+  --policy ./policy.tpdl \
+  --att /tmp/a1.catf \
+  --att /tmp/r1.catf
+```
+
+Go integration:
+
+```go
+res, err := resolver.Resolve(attestationBytesList, policyBytes, subjectCID)
+if err != nil { /* handle */ }
+
+crofBytes := crof.Render(
+  res,
+  crof.PolicyCID(policyBytes),
+  attestationCIDs,
+  crof.RenderOptions{ResolverID: "your-resolver", ResolvedAt: time.Now()},
+)
+```
+
+Your application typically consumes:
+
+- `res.State` (Resolved / Unresolved / Forked / Revoked)
+- `res.Paths` (valid chains)
+- `res.Forks` (competing heads)
+
+---
+
+## 8) Naming (optional)
+
+If you want stable human-readable identifiers (e.g. `contracts.realestate.123-main-st@final`):
+
+- Create `Type=name-binding` attestations with `Name`, `Version`, `Points-To`
+- Resolve with `resolve-name`
+
+This is typically how a project builds a registry layer that maps names → subject CIDs.
+
+---
+
+## Integration checklist
+
+An external project usually needs to ship:
+
+- A **role registry** (constants) used by UI, policy generation, and attestation issuance
+- A **policy generator** (TPDL templates + “who is trusted for what role”)
+- A **subject canonicalization rule** (what bytes are hashed/published)
+- A **key strategy** (KMS-lite for pilots, or existing signer infrastructure)
+- A **storage layer** for:
+  - subject bytes (optional IPFS)
+  - attestations (object store / database / filesystem)
+  - policies (versioned config)
+- A **resolver runner** (on-demand, scheduled, or node service)
+
+---
+
+## Common pitfalls
+
+- **CID mismatch**: if your subject serialization is not deterministic, different parties will hash different bytes.
+- **Policy drift**: changing role names or trust mappings breaks resolution semantics.
+- **Using `ipfs add` when you expect `doc-cid`**: `ipfs add` typically yields a different CID (UnixFS DAG), while this system’s `doc-cid` / `ipfs put` is a raw-block CID over exact bytes.
+- **Shell `$` expansion**: if you embed dollar signs in claim values in bash, use single quotes (e.g. `'Good-Faith-Money=$10,000'`).

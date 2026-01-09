@@ -2,6 +2,7 @@
 
 - Reference design: [ReferenceDesign.md](ReferenceDesign.md)
 - CLI how-to: [CLI.md](CLI.md)
+- Integration guide: [Integration.md](Integration.md)
 - End-to-end workflows: [UseCases.md](UseCases.md)
 - Runnable scripts: [examples/README.md](examples/README.md)
 
