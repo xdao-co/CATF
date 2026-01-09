@@ -597,8 +597,210 @@ Non-deterministic resolvers:
 
 ---
 
-## 16. Final Statement
+## 16. Trust Policy DSL (TPDL)
 
-> **Determinism is the foundation of trust without authority.**
+This section defines the **Trust Policy Domain Language (TPDL)**. TPDL is a minimal, text-first language used by resolvers to express trust assumptions deterministically.
 
-If independent resolvers cannot converge, the system has failed — regardless of cryptography, distribution, or intent.
+TPDL is intentionally small, boring, and explicit. It is not expressive by default; it is extensible by layering.
+
+---
+
+## 16.1 Design Goals
+
+TPDL MUST:
+
+* Be human-readable without tooling
+* Be deterministic and side-effect free
+* Be archivable as plain text
+* Avoid Turing-completeness
+* Allow independent implementations to converge
+
+TPDL MUST NOT:
+
+* Execute code
+* Fetch network resources
+* Depend on external state
+
+---
+
+## 16.2 Core Model
+
+A Trust Policy evaluates attestations by answering two questions:
+
+1. **Is the issuer trusted for this claim?**
+2. **Are sufficient trusted claims present?**
+
+TPDL expresses these rules declaratively.
+
+---
+
+## 16.3 Policy Document Structure
+
+A TPDL document is plain text with fixed sections:
+
+```
+-----BEGIN XDAO TRUST POLICY-----
+META
+TRUST
+RULES
+-----END XDAO TRUST POLICY-----
+```
+
+---
+
+## 16.4 META Section
+
+Describes the policy itself.
+
+```
+META
+Version: 1
+Spec: xdao-tpdl-1
+Description: Iowa real estate purchase agreement policy
+```
+
+---
+
+## 16.5 TRUST Section
+
+Defines trusted identities and roles.
+
+```
+TRUST
+Key: ed25519:BUYER_KEY
+Role: buyer
+
+Key: ed25519:SELLER_KEY
+Role: seller
+
+Key: ed25519:NOTARY_KEY
+Role: notary
+```
+
+Rules:
+
+* Keys may appear multiple times with different roles
+* Roles are symbolic strings
+* No implicit trust exists outside this section
+
+---
+
+## 16.6 RULES Section
+
+Defines evaluation rules.
+
+### 16.6.1 Require Rules
+
+```
+RULES
+Require:
+  Type: approval
+  Role: buyer
+
+Require:
+  Type: approval
+  Role: seller
+
+Require:
+  Type: notarization
+  Role: notary
+```
+
+Semantics:
+
+* Each `Require` block must be satisfied
+* Order is irrelevant
+
+---
+
+### 16.6.2 Quorum Rules (Optional)
+
+```
+Require:
+  Type: approval
+  Role: board-member
+  Quorum: 3
+```
+
+Semantics:
+
+* At least `Quorum` distinct trusted issuers must satisfy the rule
+
+---
+
+### 16.6.3 Supersession Rules
+
+```
+Supersedes:
+  Allowed-By: buyer, seller
+```
+
+Semantics:
+
+* Supersession attestations are trusted only if signed by allowed roles
+
+---
+
+## 16.7 Deterministic Evaluation Rules
+
+Resolvers MUST:
+
+* Evaluate TRUST bindings first
+* Evaluate RULES independently
+* Treat missing rules as unmet
+* Treat unmet rules as unresolved state
+
+No rule short-circuiting is permitted.
+
+---
+
+## 16.8 Prohibited Features
+
+TPDL MUST NOT include:
+
+* Conditionals (`if`, `else`)
+* Loops
+* Arithmetic beyond quorum counts
+* Time-based logic
+* External references
+
+---
+
+## 16.9 Policy Resolution Output
+
+Policy evaluation yields:
+
+* `Satisfied`
+* `Unsatisfied`
+* `Insufficient Evidence`
+
+These results feed into the Deterministic Resolver Contract.
+
+---
+
+## 16.10 Policy Versioning
+
+Policies are immutable documents.
+
+Updates require:
+
+* New policy document
+* Explicit supersession via CATF attestation
+
+---
+
+## 16.11 Compliance Requirement
+
+Resolvers claiming xDAO compatibility MUST:
+
+* Parse TPDL exactly as specified
+* Reject non-conforming policies
+* Apply policies deterministically
+
+---
+
+## 17. Final Statement (Extended)
+
+> **Trust policies declare assumptions.**
+> **Resolvers apply them mechanically.**
+> **Truth emerges from evidence plus policy — never from code alone.**
