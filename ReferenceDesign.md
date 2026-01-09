@@ -799,8 +799,204 @@ Resolvers claiming xDAO compatibility MUST:
 
 ---
 
-## 17. Final Statement (Extended)
+## 17. Canonical Resolver Output Format (CROF)
 
-> **Trust policies declare assumptions.**
-> **Resolvers apply them mechanically.**
-> **Truth emerges from evidence plus policy — never from code alone.**
+This section defines the **Canonical Resolver Output Format (CROF)**. CROF is the canonical, text-first, archivable representation of a resolver’s resolved view at a specific point in time.
+
+CROF answers the question:
+
+> *“Given these attestations, this trust policy, and this context — what did this resolver conclude?”*
+
+CROF is itself **evidence** and may be archived, transmitted, signed, and later re-evaluated.
+
+---
+
+## 17.1 Design Goals
+
+CROF MUST:
+
+* Be deterministic and canonical
+* Be human-readable without software
+* Preserve forks and uncertainty explicitly
+* Bind resolution output to exact inputs
+* Be archivable and printable
+
+CROF MUST NOT:
+
+* Hide disagreement
+* Imply global or permanent truth
+* Depend on network access
+
+---
+
+## 17.2 CROF Document Structure
+
+A CROF document is plain text with fixed sections:
+
+```
+-----BEGIN XDAO RESOLUTION-----
+META
+INPUTS
+RESULT
+PATHS
+FORKS
+EXCLUSIONS
+CRYPTO
+-----END XDAO RESOLUTION-----
+```
+
+All sections MUST appear, even if empty.
+
+---
+
+## 17.3 META Section
+
+Describes the resolution event.
+
+```
+META
+Version: 1
+Spec: xdao-crof-1
+Resolver-ID: xdao-resolver-reference
+Resolved-At: 2026-01-10T03:12:00Z
+```
+
+`Resolved-At` is informational only.
+
+---
+
+## 17.4 INPUTS Section
+
+Binds the resolution output to its inputs.
+
+```
+INPUTS
+Trust-Policy-CID: bafybeipolicy...
+Attestation-CID: bafybeiatta1...
+Attestation-CID: bafybeiatta2...
+```
+
+Rules:
+
+* All input attestations MUST be listed
+* Ordering MUST be lexicographic by CID
+
+---
+
+## 17.5 RESULT Section
+
+Defines the resolver’s high-level conclusion.
+
+```
+RESULT
+State: Resolved | Forked | Unresolved | Revoked
+Confidence: High | Medium | Low | Undefined
+```
+
+Confidence is advisory and policy-dependent.
+
+---
+
+## 17.6 PATHS Section
+
+Enumerates trusted resolution paths.
+
+```
+PATHS
+Path-ID: primary
+Attestation-CID: bafybeiatta1...
+Attestation-CID: bafybeiatta3...
+```
+
+Rules:
+
+* Each path is ordered causally
+* Multiple paths MAY exist
+
+---
+
+## 17.7 FORKS Section
+
+Explicitly lists conflicting trusted paths.
+
+```
+FORKS
+Fork-ID: fork-1
+Conflicting-Path: primary
+Conflicting-Path: alternative
+```
+
+Fork absence MUST be explicit.
+
+---
+
+## 17.8 EXCLUSIONS Section
+
+Lists attestations excluded from trust.
+
+```
+EXCLUSIONS
+Attestation-CID: bafybeibad...
+Reason: Signature invalid
+```
+
+Reasons MUST be explicit and textual.
+
+---
+
+## 17.9 CRYPTO Section
+
+Binds the resolution output cryptographically.
+
+```
+CRYPTO
+Resolver-Key: ed25519:RESOLVERKEY...
+Signature-Alg: ed25519
+Hash-Alg: sha256
+Signature: MEUCIQDv...
+```
+
+The signature covers the entire CROF document excluding the `Signature:` line.
+
+---
+
+## 17.10 Determinism Requirements
+
+Resolvers MUST:
+
+* Canonicalize CROF output deterministically
+* Produce identical CROF bytes for identical inputs
+* Include all forks and exclusions
+
+---
+
+## 17.11 CROF as Evidence
+
+CROF documents:
+
+* MAY be stored on IPFS
+* MAY be CID-addressed
+* MAY be cross-signed
+* MAY be superseded by later CROFs
+
+CROF does not replace attestations; it records interpretation.
+
+---
+
+## 17.12 Non-Goals of CROF
+
+CROF MUST NOT:
+
+* Enforce real-world actions
+* Resolve forks automatically
+* Assert global truth
+
+---
+
+## 18. Final Statement (Extended)
+
+> **Attestations record what was said.**
+> **Policies record what was trusted.**
+> **CROF records what was believed — and why.**
+
+CROF is the memory of interpretation, preserved honestly for the future.
