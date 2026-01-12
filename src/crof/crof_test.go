@@ -20,7 +20,7 @@ func TestRender_AlwaysHasAllSections(t *testing.T) {
 	if !strings.Contains(out, Postamble+"\n") {
 		t.Fatalf("expected CROF postamble")
 	}
-	for _, sec := range []string{"META", "INPUTS", "RESULT", "PATHS", "FORKS", "EXCLUSIONS", "CRYPTO"} {
+	for _, sec := range []string{"META", "INPUTS", "RESULT", "PATHS", "FORKS", "EXCLUSIONS", "VERDICTS", "CRYPTO"} {
 		if !strings.Contains(out, "\n"+sec+"\n") {
 			t.Fatalf("expected CROF to contain section %s", sec)
 		}

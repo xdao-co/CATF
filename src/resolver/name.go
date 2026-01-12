@@ -22,6 +22,7 @@ type NameResolution struct {
 
 	Forks      []NameFork
 	Exclusions []Exclusion
+	Verdicts   []Verdict
 }
 
 type NameFork struct {
@@ -40,36 +41,71 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 
 	var atts []*attestation
 	var exclusions []Exclusion
+	var verdicts []Verdict
+	verdictIndex := make(map[string]int)
 
 	for _, b := range attestationBytes {
+		v := Verdict{}
 		a, perr := catf.Parse(b)
 		if perr != nil {
-			exclusions = append(exclusions, Exclusion{CID: cidutil.CIDv1RawSHA256(b), Reason: "CATF parse/canonicalization failed"})
+			v.CID = cidutil.CIDv1RawSHA256(b)
+			v.ExcludedReason = "CATF parse/canonicalization failed"
+			verdicts = append(verdicts, v)
+			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
 			continue
 		}
 		cid := a.CID()
+		v.CID = cid
+		v.IssuerKey = a.IssuerKey()
+		v.ClaimType = a.ClaimType()
 		if err := catf.ValidateCoreClaims(a); err != nil {
-			exclusions = append(exclusions, Exclusion{CID: cid, Reason: err.Error()})
+			v.ExcludedReason = err.Error()
+			verdicts = append(verdicts, v)
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
 		}
 		if err := a.Verify(); err != nil {
-			exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Signature invalid"})
+			v.ExcludedReason = "Signature invalid"
+			verdicts = append(verdicts, v)
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
 		}
 		att := &attestation{catf: a, cid: cid}
 		if roles, ok := trustIndex[a.IssuerKey()]; ok {
 			att.trusted = true
 			att.trustRoles = roles
+			v.Trusted = true
+			for r := range roles {
+				v.TrustRoles = append(v.TrustRoles, r)
+			}
+			sort.Strings(v.TrustRoles)
 		} else {
-			exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Issuer not trusted"})
+			v.ExcludedReason = "Issuer not trusted"
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 		}
+		verdictIndex[cid] = len(verdicts)
+		verdicts = append(verdicts, v)
 		atts = append(atts, att)
 	}
 
 	sort.Slice(atts, func(i, j int) bool { return atts[i].cid < atts[j].cid })
 	applyRevocations(atts)
+	for _, a := range atts {
+		if !a.revoked {
+			continue
+		}
+		if idx, ok := verdictIndex[a.cid]; ok {
+			verdicts[idx].Revoked = true
+		}
+	}
+	sort.Slice(verdicts, func(i, j int) bool {
+		if verdicts[i].CID == verdicts[j].CID {
+			return verdicts[i].ExcludedReason < verdicts[j].ExcludedReason
+		}
+		return verdicts[i].CID < verdicts[j].CID
+	})
 
-	res := &NameResolution{Name: name, Version: version, Confidence: ConfidenceUndefined, Exclusions: exclusions}
+	res := &NameResolution{Name: name, Version: version, Confidence: ConfidenceUndefined, Exclusions: exclusions, Verdicts: verdicts}
 
 	// Collect all name-binding attestations for the requested name (+ optional version).
 	var candidates []*attestation

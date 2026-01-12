@@ -148,6 +148,58 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	}
 	sb.WriteString("\n")
 
+	// VERDICTS
+	sb.WriteString("VERDICTS\n")
+	verdicts := append([]resolver.Verdict(nil), res.Verdicts...)
+	sort.Slice(verdicts, func(i, j int) bool {
+		if verdicts[i].CID == verdicts[j].CID {
+			return verdicts[i].ExcludedReason < verdicts[j].ExcludedReason
+		}
+		return verdicts[i].CID < verdicts[j].CID
+	})
+	for _, v := range verdicts {
+		if v.CID != "" {
+			sb.WriteString("Attestation-CID: ")
+			sb.WriteString(v.CID)
+			sb.WriteString("\n")
+		}
+		if v.IssuerKey != "" {
+			sb.WriteString("Issuer-Key: ")
+			sb.WriteString(v.IssuerKey)
+			sb.WriteString("\n")
+		}
+		if v.ClaimType != "" {
+			sb.WriteString("Claim-Type: ")
+			sb.WriteString(v.ClaimType)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("Trusted: ")
+		if v.Trusted {
+			sb.WriteString("true\n")
+		} else {
+			sb.WriteString("false\n")
+		}
+		sb.WriteString("Revoked: ")
+		if v.Revoked {
+			sb.WriteString("true\n")
+		} else {
+			sb.WriteString("false\n")
+		}
+		roles := append([]string(nil), v.TrustRoles...)
+		sort.Strings(roles)
+		for _, r := range roles {
+			sb.WriteString("Trust-Role: ")
+			sb.WriteString(r)
+			sb.WriteString("\n")
+		}
+		if v.ExcludedReason != "" {
+			sb.WriteString("Excluded-Reason: ")
+			sb.WriteString(v.ExcludedReason)
+			sb.WriteString("\n")
+		}
+	}
+	sb.WriteString("\n")
+
 	// CRYPTO (left empty in this reference implementation)
 	sb.WriteString("CRYPTO\n")
 	cryptoLines := []string{}

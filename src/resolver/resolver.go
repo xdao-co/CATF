@@ -35,6 +35,7 @@ type Resolution struct {
 	Paths      []Path
 	Forks      []Fork
 	Exclusions []Exclusion
+	Verdicts   []Verdict
 }
 
 type Path struct {
@@ -50,6 +51,22 @@ type Fork struct {
 type Exclusion struct {
 	CID    string
 	Reason string
+}
+
+// Verdict is an explicit per-attestation policy/trust evaluation record.
+//
+// These are intended to be surfaced as evidence (e.g. in CROF) so callers do
+// not need to reverse-engineer resolver decisions from a final Path/Fork alone.
+type Verdict struct {
+	CID       string
+	IssuerKey string
+	ClaimType string
+
+	Trusted    bool
+	TrustRoles []string
+	Revoked    bool
+
+	ExcludedReason string // empty when not excluded at ingestion
 }
 
 type attestation struct {
@@ -73,28 +90,47 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 
 	var atts []*attestation
 	var exclusions []Exclusion
+	var verdicts []Verdict
+	verdictIndex := make(map[string]int)
 
 	for _, b := range attestationBytes {
+		v := Verdict{}
 		a, perr := catf.Parse(b)
 		if perr != nil {
-			exclusions = append(exclusions, Exclusion{CID: cidutil.CIDv1RawSHA256(b), Reason: "CATF parse/canonicalization failed"})
+			v.CID = cidutil.CIDv1RawSHA256(b)
+			v.ExcludedReason = "CATF parse/canonicalization failed"
+			verdicts = append(verdicts, v)
+			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
 			continue
 		}
 		cid := a.CID()
+		v.CID = cid
+		v.IssuerKey = a.IssuerKey()
+		v.ClaimType = a.ClaimType()
 		if err := catf.ValidateCoreClaims(a); err != nil {
-			exclusions = append(exclusions, Exclusion{CID: cid, Reason: err.Error()})
+			v.ExcludedReason = err.Error()
+			verdicts = append(verdicts, v)
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
 		}
 		if err := a.Verify(); err != nil {
-			exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Signature invalid"})
+			v.ExcludedReason = "Signature invalid"
+			verdicts = append(verdicts, v)
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
 		}
 		att := &attestation{catf: a, cid: cid}
 		if roles, ok := trustIndex[a.IssuerKey()]; ok {
 			att.trusted = true
 			att.trustRoles = roles
+			v.Trusted = true
+			for r := range roles {
+				v.TrustRoles = append(v.TrustRoles, r)
+			}
+			sort.Strings(v.TrustRoles)
 		} else {
-			exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Issuer not trusted"})
+			v.ExcludedReason = "Issuer not trusted"
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 		}
 		if att.trusted && a.ClaimType() == "supersedes" && len(policy.SupersedesAllowedBy) > 0 {
 			allowed := false
@@ -106,14 +142,33 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 			}
 			if !allowed {
 				att.trusted = false
-				exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Supersedes not allowed by policy"})
+				v.Trusted = false
+				v.TrustRoles = nil
+				v.ExcludedReason = "Supersedes not allowed by policy"
+				exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			}
 		}
+		verdictIndex[cid] = len(verdicts)
+		verdicts = append(verdicts, v)
 		atts = append(atts, att)
 	}
 
 	sort.Slice(atts, func(i, j int) bool { return atts[i].cid < atts[j].cid })
 	applyRevocations(atts)
+	for _, a := range atts {
+		if !a.revoked {
+			continue
+		}
+		if idx, ok := verdictIndex[a.cid]; ok {
+			verdicts[idx].Revoked = true
+		}
+	}
+	sort.Slice(verdicts, func(i, j int) bool {
+		if verdicts[i].CID == verdicts[j].CID {
+			return verdicts[i].ExcludedReason < verdicts[j].ExcludedReason
+		}
+		return verdicts[i].CID < verdicts[j].CID
+	})
 
 	// Only consider attestations about this subject.
 	var subjectAtts []*attestation
@@ -123,7 +178,7 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 		}
 	}
 
-	res := &Resolution{SubjectCID: subjectCID, Confidence: ConfidenceUndefined, Exclusions: exclusions}
+	res := &Resolution{SubjectCID: subjectCID, Confidence: ConfidenceUndefined, Exclusions: exclusions, Verdicts: verdicts}
 	if len(subjectAtts) == 0 {
 		res.State = StateUnresolved
 		return res, nil

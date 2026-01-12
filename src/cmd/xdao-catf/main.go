@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,13 +11,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"xdao.co/catf/catf"
 	"xdao.co/catf/cidutil"
 	"xdao.co/catf/crof"
+	"xdao.co/catf/keys"
 	"xdao.co/catf/resolver"
 )
 
@@ -291,14 +288,18 @@ func cmdAttest(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
-	seed, err := loadSeed(seedHex, signerName, signerRole, keyFile)
+	ks, err := keys.CreateKeyStore("")
+	if err != nil {
+		fmt.Fprintf(errOut, "keys: %v\n", err)
+		return 1
+	}
+	seed, err := ks.LoadSeed(seedHex, signerName, signerRole, keyFile)
 	if err != nil {
 		fmt.Fprintf(errOut, "invalid signer: %v\n", err)
 		return 2
 	}
 	priv := ed25519.NewKeyFromSeed(seed)
-	pub := priv.Public().(ed25519.PublicKey)
-	issuerKey := "ed25519:" + base64.StdEncoding.EncodeToString(pub)
+	issuerKey := keys.GenerateIssuerKeyFromSeed(seed)
 	if printIssuerKey {
 		fmt.Fprintf(errOut, "Issuer-Key: %s\n", issuerKey)
 	}
@@ -474,15 +475,20 @@ func cmdKeyInit(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "missing --name")
 		return 2
 	}
-	if err := validateKeyName(name); err != nil {
+	if err := keys.CheckKeyName(name); err != nil {
 		fmt.Fprintf(errOut, "invalid --name: %v\n", err)
 		return 2
+	}
+	ks, err := keys.CreateKeyStore("")
+	if err != nil {
+		fmt.Fprintf(errOut, "keys: %v\n", err)
+		return 1
 	}
 
 	var seed []byte
 	if seedHex != "" {
 		var derr error
-		seed, derr = decodeSeedHex(seedHex)
+		seed, derr = keys.ParseSeedHex(seedHex)
 		if derr != nil {
 			fmt.Fprintf(errOut, "invalid --seed-hex: %v\n", derr)
 			return 2
@@ -495,17 +501,11 @@ func cmdKeyInit(args []string, out io.Writer, errOut io.Writer) int {
 		}
 	}
 
-	rootPath, err := rootKeyPath(name)
+	issuerKey, rootPath, err := ks.InitializeRootKey(name, seed, force)
 	if err != nil {
-		fmt.Fprintf(errOut, "key path: %v\n", err)
-		return 1
-	}
-	if err := writeSeedFile(rootPath, seed, force); err != nil {
 		fmt.Fprintf(errOut, "write key: %v\n", err)
 		return 1
 	}
-
-	issuerKey := issuerKeyFromSeed(seed)
 	fmt.Fprintf(out, "Created root key: %s\n", issuerKey)
 	fmt.Fprintf(out, "Stored at: %s\n", rootPath)
 	return 0
@@ -534,42 +534,24 @@ func cmdKeyDerive(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "missing --role")
 		return 2
 	}
-	if err := validateKeyName(from); err != nil {
+	if err := keys.CheckKeyName(from); err != nil {
 		fmt.Fprintf(errOut, "invalid --from: %v\n", err)
 		return 2
 	}
-	if err := validateRole(role); err != nil {
+	if err := keys.CheckRole(role); err != nil {
 		fmt.Fprintf(errOut, "invalid --role: %v\n", err)
 		return 2
 	}
-
-	rootPath, err := rootKeyPath(from)
+	ks, err := keys.CreateKeyStore("")
 	if err != nil {
-		fmt.Fprintf(errOut, "key path: %v\n", err)
+		fmt.Fprintf(errOut, "keys: %v\n", err)
 		return 1
 	}
-	rootSeed, err := readSeedFile(rootPath)
+	issuerKey, rolePath, err := ks.DeriveKeyFromRole(from, role, force)
 	if err != nil {
-		fmt.Fprintf(errOut, "read root key: %v\n", err)
+		fmt.Fprintf(errOut, "derive role key: %v\n", err)
 		return 1
 	}
-	roleSeed, err := deriveRoleSeed(rootSeed, role)
-	if err != nil {
-		fmt.Fprintf(errOut, "derive role seed: %v\n", err)
-		return 1
-	}
-
-	rolePath, err := roleKeyPath(from, role)
-	if err != nil {
-		fmt.Fprintf(errOut, "key path: %v\n", err)
-		return 1
-	}
-	if err := writeSeedFile(rolePath, roleSeed, force); err != nil {
-		fmt.Fprintf(errOut, "write role key: %v\n", err)
-		return 1
-	}
-
-	issuerKey := issuerKeyFromSeed(roleSeed)
 	fmt.Fprintf(out, "Created role key: %s\n", issuerKey)
 	fmt.Fprintf(out, "Stored at: %s\n", rolePath)
 	return 0
@@ -592,31 +574,27 @@ func cmdKeyExport(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "missing --name")
 		return 2
 	}
-	if err := validateKeyName(name); err != nil {
+	if err := keys.CheckKeyName(name); err != nil {
 		fmt.Fprintf(errOut, "invalid --name: %v\n", err)
 		return 2
 	}
-	var path string
-	var err error
-	if role == "" {
-		path, err = rootKeyPath(name)
-	} else {
-		if err := validateRole(role); err != nil {
+	if role != "" {
+		if err := keys.CheckRole(role); err != nil {
 			fmt.Fprintf(errOut, "invalid --role: %v\n", err)
 			return 2
 		}
-		path, err = roleKeyPath(name, role)
 	}
+	ks, err := keys.CreateKeyStore("")
 	if err != nil {
-		fmt.Fprintf(errOut, "key path: %v\n", err)
+		fmt.Fprintf(errOut, "keys: %v\n", err)
 		return 1
 	}
-	seed, err := readSeedFile(path)
+	issuerKey, err := ks.ExportKey(name, role)
 	if err != nil {
-		fmt.Fprintf(errOut, "read key: %v\n", err)
+		fmt.Fprintf(errOut, "export key: %v\n", err)
 		return 1
 	}
-	_, _ = fmt.Fprintln(out, issuerKeyFromSeed(seed))
+	_, _ = fmt.Fprintln(out, issuerKey)
 	return 0
 }
 
@@ -626,47 +604,19 @@ func cmdKeyList(args []string, out io.Writer, errOut io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	base, err := keysBaseDir()
+	ks, err := keys.CreateKeyStore("")
 	if err != nil {
-		fmt.Fprintf(errOut, "keys dir: %v\n", err)
+		fmt.Fprintf(errOut, "keys: %v\n", err)
 		return 1
 	}
-
-	entries, err := os.ReadDir(base)
+	entries, err := ks.ListKeys()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return 0
-		}
-		fmt.Fprintf(errOut, "read keys dir: %v\n", err)
+		fmt.Fprintf(errOut, "list keys: %v\n", err)
 		return 1
 	}
-
-	var names []string
 	for _, e := range entries {
-		if e.IsDir() {
-			names = append(names, e.Name())
-		}
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		fmt.Fprintf(out, "%s\n", name)
-		// roles are optional
-		rolesDir := filepath.Join(base, name, "roles")
-		roleEntries, rerr := os.ReadDir(rolesDir)
-		if rerr != nil {
-			continue
-		}
-		var roles []string
-		for _, re := range roleEntries {
-			if re.IsDir() {
-				continue
-			}
-			if strings.HasSuffix(re.Name(), ".key") {
-				roles = append(roles, strings.TrimSuffix(re.Name(), ".key"))
-			}
-		}
-		sort.Strings(roles)
-		for _, r := range roles {
+		fmt.Fprintf(out, "%s\n", e.Identifier)
+		for _, r := range e.Permissions {
 			fmt.Fprintf(out, "  - %s\n", r)
 		}
 	}
@@ -895,158 +845,4 @@ func parseKVClaims(items []string) (map[string]string, error) {
 		claims[k] = v
 	}
 	return claims, nil
-}
-
-func decodeSeedHex(seedHex string) ([]byte, error) {
-	seedHex = strings.TrimSpace(seedHex)
-	seedHex = strings.TrimPrefix(seedHex, "0x")
-	b, err := hex.DecodeString(seedHex)
-	if err != nil {
-		return nil, err
-	}
-	if len(b) != ed25519.SeedSize {
-		return nil, fmt.Errorf("seed must be %d bytes, got %d", ed25519.SeedSize, len(b))
-	}
-	return b, nil
-}
-
-func keysBaseDir() (string, error) {
-	h, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(h, ".xdao", "keys"), nil
-}
-
-func rootKeyPath(name string) (string, error) {
-	base, err := keysBaseDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(base, name, "root.key"), nil
-}
-
-func roleKeyPath(name, role string) (string, error) {
-	base, err := keysBaseDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(base, name, "roles", role+".key"), nil
-}
-
-func writeSeedFile(path string, seed []byte, force bool) error {
-	if len(seed) != ed25519.SeedSize {
-		return fmt.Errorf("seed must be %d bytes", ed25519.SeedSize)
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	flags := os.O_WRONLY | os.O_CREATE
-	if force {
-		flags |= os.O_TRUNC
-	} else {
-		flags |= os.O_EXCL
-	}
-	f, err := os.OpenFile(path, flags, 0o600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.WriteString(hex.EncodeToString(seed) + "\n"); err != nil {
-		return err
-	}
-	return f.Close()
-}
-
-func readSeedFile(path string) ([]byte, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	seedHex := strings.TrimSpace(string(b))
-	return decodeSeedHex(seedHex)
-}
-
-func issuerKeyFromSeed(seed []byte) string {
-	priv := ed25519.NewKeyFromSeed(seed)
-	pub := priv.Public().(ed25519.PublicKey)
-	return "ed25519:" + base64.StdEncoding.EncodeToString(pub)
-}
-
-func deriveRoleSeed(rootSeed []byte, role string) ([]byte, error) {
-	if len(rootSeed) != ed25519.SeedSize {
-		return nil, fmt.Errorf("root seed must be %d bytes", ed25519.SeedSize)
-	}
-	if err := validateRole(role); err != nil {
-		return nil, err
-	}
-	// Deterministic, domain-separated derivation for role keys.
-	// This is intentionally local-first and offline; it is not a global identity system.
-	h := sha256.New()
-	_, _ = h.Write(rootSeed)
-	_, _ = h.Write([]byte{0})
-	_, _ = h.Write([]byte("xdao-catf-kms-lite-v1"))
-	_, _ = h.Write([]byte{0})
-	_, _ = h.Write([]byte("role:"))
-	_, _ = h.Write([]byte(role))
-	sum := h.Sum(nil)
-	if len(sum) < ed25519.SeedSize {
-		return nil, errors.New("kdf output too short")
-	}
-	return sum[:ed25519.SeedSize], nil
-}
-
-func validateKeyName(name string) error {
-	if name == "" {
-		return errors.New("empty")
-	}
-	for _, ch := range name {
-		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' {
-			continue
-		}
-		return fmt.Errorf("invalid character %q", ch)
-	}
-	return nil
-}
-
-func validateRole(role string) error {
-	if role == "" {
-		return errors.New("empty")
-	}
-	for _, ch := range role {
-		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' {
-			continue
-		}
-		return fmt.Errorf("invalid character %q", ch)
-	}
-	return nil
-}
-
-func loadSeed(seedHex, signerName, signerRole, keyFile string) ([]byte, error) {
-	if seedHex != "" {
-		return decodeSeedHex(seedHex)
-	}
-	if keyFile != "" {
-		return readSeedFile(keyFile)
-	}
-	if signerName != "" {
-		if err := validateKeyName(signerName); err != nil {
-			return nil, err
-		}
-		var path string
-		var err error
-		if signerRole == "" {
-			path, err = rootKeyPath(signerName)
-		} else {
-			if err := validateRole(signerRole); err != nil {
-				return nil, err
-			}
-			path, err = roleKeyPath(signerName, signerRole)
-		}
-		if err != nil {
-			return nil, err
-		}
-		return readSeedFile(path)
-	}
-	return nil, errors.New("no signer provided")
 }
