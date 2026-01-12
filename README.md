@@ -1,6 +1,9 @@
 # xDAO CATF
 
 - Reference design: [ReferenceDesign.md](ReferenceDesign.md)
+- Structural contract (normative): [spec/CATF-STRUCT-1.md](spec/CATF-STRUCT-1.md)
+- Conformance vectors: [CONFORMANCE.md](CONFORMANCE.md)
+- Stability & versioning: [STABILITY.md](STABILITY.md)
 - CLI how-to: [CLI.md](CLI.md)
 - Integration guide: [Integration.md](Integration.md)
 - End-to-end workflows: [UseCases.md](UseCases.md)

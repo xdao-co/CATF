@@ -1,0 +1,19 @@
+-----BEGIN XDAO ATTESTATION-----
+META
+Spec: xdao-catf-1
+Version: 1
+
+SUBJECT
+CID: bafy-doc-1
+Description: Conformance vector
+
+CLAIMS
+Role: author
+Type: authorship
+
+CRYPTO
+Hash-Alg: sha256
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Signature: w3MYfKasFuvauSY3O7vuZb2wu+3bILf6G4BH92v3viI279UkSfjkp0ep292IG2RiCCgtH/oZbIALbYaBXG+LCw==
+Signature-Alg: ed25519
+-----END XDAO ATTESTATION-----
