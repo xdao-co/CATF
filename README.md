@@ -72,6 +72,33 @@ An attestation that associates a symbolic name (and optional version) with a CID
 
 ---
 
+### Supersession
+
+An explicit, content-addressed “this replaces that” relationship.
+
+Supersession never mutates or deletes older evidence. Instead, it creates a new immutable object (a new attestation or a new CROF) that *references* the prior object by CID.
+
+There are two common uses:
+
+- **Attestation supersession (CATF)**: an attestation with `Type=supersedes` points at a prior attestation CID (a revision chain).
+- **Resolution supersession (CROF)**: a newer CROF includes `META: Supersedes-CROF-CID: <PriorCROFCID>`.
+
+Why use supersession?
+
+- To publish an updated resolution after new attestations arrive, policy changes, or a resolver bugfix/upgrade.
+- To keep history: consumers can audit what changed and when.
+
+Minimal CROF supersession validity rules enforced by the reference implementation:
+
+- New CROF `B` must declare `Supersedes-CROF-CID` equal to `CID(A)`.
+- `A` and `B` must bind the same `RESULT: Subject-CID`.
+- `A` and `B` must use the same `META: Resolver-ID`.
+- `A` and `B` must use the same `INPUTS: Trust-Policy-CID`.
+
+For normative details, see ReferenceDesign.md §17.13 (“CROF Supersession Semantics”).
+
+---
+
 ### Resolution
 
 The process of evaluating attestations under a trust policy to produce a resolved view. Resolution does not enforce real-world action and may result in resolved, forked, unresolved, or revoked states.

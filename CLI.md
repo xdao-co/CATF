@@ -43,6 +43,40 @@ Validate CROF supersession semantics (new supersedes old):
 ./bin/xdao-catf crof validate-supersession --new /path/to/new.crof --old /path/to/old.crof
 ```
 
+#### CROF supersession workflow
+
+Supersession is how you publish an updated CROF while keeping the prior CROF immutable and auditable.
+
+1) Resolve once and save the “old” CROF:
+
+```sh
+./bin/xdao-catf resolve --subject "$SUBJECT_CID" --policy ./policy.tpdl --att /tmp/a1.catf > /tmp/old.crof
+```
+
+1) Compute the CID of the old CROF (this requires canonical CROF bytes):
+
+```sh
+OLD_CROF_CID="$(./bin/xdao-catf crof cid /tmp/old.crof)"
+```
+
+1) Re-resolve (for example: with additional attestations) and declare supersession:
+
+```sh
+./bin/xdao-catf resolve \
+  --subject "$SUBJECT_CID" \
+  --policy ./policy.tpdl \
+  --att /tmp/a1.catf \
+  --att /tmp/a2.catf \
+  --supersedes-crof "$OLD_CROF_CID" \
+  > /tmp/new.crof
+```
+
+1) Validate the relationship:
+
+```sh
+./bin/xdao-catf crof validate-supersession --new /tmp/new.crof --old /tmp/old.crof
+```
+
 ### `doc-cid`
 
 Computes a stable subject CID for a file (CIDv1 `raw` + sha2-256 multihash):

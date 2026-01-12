@@ -295,6 +295,33 @@ If you are producing a revised CROF and want to declare it supersedes a prior CR
   --supersedes-crof <PriorCROFCID>
 ```
 
+### CROF supersession (what it is and how to use it)
+
+CROF is evidence. A later resolver run may produce a revised CROF that is intended to supersede a prior CROF (for example: new attestations arrived, policy changed, or the resolver implementation was upgraded).
+
+Supersession is explicit and CID-addressed:
+
+- The new CROF includes `META: Supersedes-CROF-CID: <PriorCROFCID>`.
+- The reference implementation provides `./bin/xdao-catf crof validate-supersession --new ... --old ...` to check minimal validity rules.
+
+Go integration pattern:
+
+```go
+oldCID, err := crof.CID(oldCROFBytes)
+if err != nil { /* old CROF must be canonical */ }
+
+newCROFBytes := crof.Render(
+  res,
+  crof.PolicyCID(policyBytes),
+  attestationCIDs,
+  crof.RenderOptions{ResolverID: "your-resolver", SupersedesCROFCID: oldCID},
+)
+
+if err := crof.ValidateSupersession(newCROFBytes, oldCROFBytes); err != nil {
+  /* invalid supersession relationship */
+}
+```
+
 Go integration:
 
 ```go
