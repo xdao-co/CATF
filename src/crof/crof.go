@@ -161,6 +161,21 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	verdicts := append([]resolver.Verdict(nil), res.Verdicts...)
 	sort.Slice(verdicts, func(i, j int) bool {
 		if verdicts[i].CID == verdicts[j].CID {
+			if verdicts[i].ExcludedReason == verdicts[j].ExcludedReason {
+				if verdicts[i].IssuerKey == verdicts[j].IssuerKey {
+					if verdicts[i].ClaimType == verdicts[j].ClaimType {
+						if verdicts[i].Trusted == verdicts[j].Trusted {
+							if verdicts[i].Revoked == verdicts[j].Revoked {
+								return strings.Join(verdicts[i].TrustRoles, ",") < strings.Join(verdicts[j].TrustRoles, ",")
+							}
+							return !verdicts[i].Revoked && verdicts[j].Revoked
+						}
+						return verdicts[i].Trusted && !verdicts[j].Trusted
+					}
+					return verdicts[i].ClaimType < verdicts[j].ClaimType
+				}
+				return verdicts[i].IssuerKey < verdicts[j].IssuerKey
+			}
 			return verdicts[i].ExcludedReason < verdicts[j].ExcludedReason
 		}
 		return verdicts[i].CID < verdicts[j].CID
