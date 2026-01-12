@@ -1,7 +1,6 @@
 package catf
 
 import (
-	"errors"
 	"sort"
 	"strings"
 )
@@ -40,10 +39,10 @@ func Render(doc Document) ([]byte, error) {
 		keys := make([]string, 0, len(sec.pairs))
 		for k := range sec.pairs {
 			if k == "" {
-				return nil, errors.New("empty key")
+				return nil, newError(KindRender, "CATF-STR-030", "empty key")
 			}
 			if !isASCII(k) {
-				return nil, errors.New("non-ASCII key")
+				return nil, newError(KindRender, "CATF-STR-030", "non-ASCII key")
 			}
 			keys = append(keys, k)
 		}
@@ -51,16 +50,16 @@ func Render(doc Document) ([]byte, error) {
 		for _, k := range keys {
 			v := sec.pairs[k]
 			if v == "" {
-				return nil, errors.New("empty value")
+				return nil, newError(KindRender, "CATF-STR-030", "empty value")
 			}
 			if strings.HasPrefix(v, " ") {
-				return nil, errors.New("value must not start with a space")
+				return nil, newError(KindRender, "CATF-STR-030", "value must not start with a space")
 			}
 			if strings.Contains(v, "\n") || strings.Contains(v, "\r") {
-				return nil, errors.New("value must not contain newlines")
+				return nil, newError(KindRender, "CATF-STR-030", "value must not contain newlines")
 			}
 			if strings.HasSuffix(v, " ") || strings.HasSuffix(v, "\t") {
-				return nil, errors.New("trailing whitespace forbidden")
+				return nil, newError(KindRender, "CATF-STR-030", "trailing whitespace forbidden")
 			}
 			sb.WriteString(k)
 			sb.WriteString(": ")

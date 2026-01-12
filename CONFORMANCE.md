@@ -10,6 +10,7 @@ Constraints:
 ## Locations
 
 - Structural contract (normative): [spec/CATF-STRUCT-1.md](spec/CATF-STRUCT-1.md)
+- Error taxonomy & rule catalog (normative): [spec/CATF-ERRORS-1.md](spec/CATF-ERRORS-1.md)
 - CATF vectors: `src/testdata/conformance/catf/`
 
 ## What Vectors Assert

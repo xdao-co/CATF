@@ -1,6 +1,9 @@
 package catf
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
 
 // NormalizeCATF canonicalizes a CATF document by parsing into the section model
 // and re-rendering under the canonical rendering rules.
@@ -13,10 +16,6 @@ import "bytes"
 // (currently: optional UTF-8 BOM, CRLF line endings, and trailing newlines) and
 // produces canonical output bytes.
 func NormalizeCATF(input []byte) ([]byte, error) {
-	if input == nil {
-		return nil, newError(KindParse, "CATF-STR-000", "nil input")
-	}
-
 	b := input
 
 	// Tolerate a UTF-8 BOM by removing it.
@@ -57,6 +56,10 @@ func NormalizeCATF(input []byte) ([]byte, error) {
 
 	canonical, rerr := Render(doc)
 	if rerr != nil {
+		var e *Error
+		if errors.As(rerr, &e) {
+			return nil, rerr
+		}
 		return nil, wrapError(KindRender, "CATF-RENDER-001", "render failure", rerr)
 	}
 
