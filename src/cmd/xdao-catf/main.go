@@ -16,6 +16,7 @@ import (
 
 	"xdao.co/catf/catf"
 	"xdao.co/catf/cidutil"
+	"xdao.co/catf/compliance"
 	"xdao.co/catf/crof"
 	"xdao.co/catf/keys"
 	"xdao.co/catf/resolver"
@@ -34,6 +35,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	switch args[0] {
 	case "attest":
 		return cmdAttest(args[1:], out, errOut)
+	case "crof":
+		return cmdCROF(args[1:], out, errOut)
 	case "doc-cid":
 		return cmdDocCID(args[1:], out, errOut)
 	case "ipfs":
@@ -58,6 +61,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "xdao-catf: minimum CATF/TPDL/Resolver CLI")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  xdao-catf crof cid <file>")
+	fmt.Fprintln(w, "  xdao-catf crof validate-supersession --new <file> --old <file>")
 	fmt.Fprintln(w, "  xdao-catf doc-cid <file>")
 	fmt.Fprintln(w, "  xdao-catf ipfs put [--pin] [--init] <file>")
 	fmt.Fprintln(w, "  xdao-catf key init --name <name> [--seed-hex <64hex>] [--force]")
@@ -65,8 +70,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  xdao-catf key list")
 	fmt.Fprintln(w, "  xdao-catf key export --name <name> [--role <role>]")
 	fmt.Fprintln(w, "  xdao-catf attest --subject <CID> --description <text> (--seed-hex <64hex> | --signer <name> [--signer-role <role>] | --key-file <path>) [--type <t>] [--role <r>] [--claim Key=Value ...]")
-	fmt.Fprintln(w, "  xdao-catf resolve --subject <CID> --policy <tpdl.txt> --att <a1.catf> [--att ...] [--supersedes-crof <CID>]")
-	fmt.Fprintln(w, "  xdao-catf resolve-name --name <Name> [--version <v>] --policy <tpdl.txt> --att <a1.catf> [--att ...] [--supersedes-crof <CID>]")
+	fmt.Fprintln(w, "  xdao-catf resolve --subject <CID> --policy <tpdl.txt> --att <a1.catf> [--att ...] [--supersedes-crof <CID>] [--mode permissive|strict]")
+	fmt.Fprintln(w, "  xdao-catf resolve-name --name <Name> [--version <v>] --policy <tpdl.txt> --att <a1.catf> [--att ...] [--supersedes-crof <CID>] [--mode permissive|strict]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Notes:")
 	fmt.Fprintln(w, "  - --seed-hex must be 32 bytes (64 hex chars) ed25519 seed")
@@ -79,6 +84,66 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  - approval attestations require Effective-Date (provide --effective-date or --claim Effective-Date=...)")
 	fmt.Fprintln(w, "  - attest writes canonical CATF bytes to stdout (no trailing newline)")
 	fmt.Fprintln(w, "  - resolve/resolve-name print canonical CROF to stdout")
+}
+
+func cmdCROF(args []string, out io.Writer, errOut io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(errOut, "usage: xdao-catf crof <subcommand> ...")
+		fmt.Fprintln(errOut, "subcommands: cid, validate-supersession")
+		return 2
+	}
+	switch args[0] {
+	case "cid":
+		fs := flag.NewFlagSet("crof cid", flag.ContinueOnError)
+		fs.SetOutput(errOut)
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if fs.NArg() != 1 {
+			fmt.Fprintln(errOut, "usage: xdao-catf crof cid <file>")
+			return 2
+		}
+		b, err := os.ReadFile(fs.Arg(0))
+		if err != nil {
+			fmt.Fprintf(errOut, "read crof: %v\n", err)
+			return 1
+		}
+		_, _ = fmt.Fprintln(out, crof.CID(b))
+		return 0
+	case "validate-supersession":
+		fs := flag.NewFlagSet("crof validate-supersession", flag.ContinueOnError)
+		fs.SetOutput(errOut)
+		var newPath string
+		var oldPath string
+		fs.StringVar(&newPath, "new", "", "New CROF file")
+		fs.StringVar(&oldPath, "old", "", "Old CROF file")
+		if err := fs.Parse(args[1:]); err != nil {
+			return 2
+		}
+		if newPath == "" || oldPath == "" {
+			fmt.Fprintln(errOut, "usage: xdao-catf crof validate-supersession --new <file> --old <file>")
+			return 2
+		}
+		newBytes, err := os.ReadFile(newPath)
+		if err != nil {
+			fmt.Fprintf(errOut, "read --new: %v\n", err)
+			return 1
+		}
+		oldBytes, err := os.ReadFile(oldPath)
+		if err != nil {
+			fmt.Fprintf(errOut, "read --old: %v\n", err)
+			return 1
+		}
+		if err := crof.ValidateSupersession(newBytes, oldBytes); err != nil {
+			fmt.Fprintf(errOut, "invalid: %v\n", err)
+			return 1
+		}
+		_, _ = fmt.Fprintln(out, "OK")
+		return 0
+	default:
+		fmt.Fprintf(errOut, "unknown crof subcommand: %s\n", args[0])
+		return 2
+	}
 }
 
 func cmdIPFS(args []string, out io.Writer, errOut io.Writer) int {
@@ -653,6 +718,7 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 	var resolverID string
 	var resolvedAt string
 	var supersedesCROF string
+	var mode string
 
 	fs.StringVar(&subjectCID, "subject", "", "Subject CID")
 	fs.StringVar(&policyPath, "policy", "", "TPDL policy file")
@@ -660,6 +726,7 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&resolverID, "resolver-id", "xdao-resolver-reference", "Resolver-ID recorded in CROF")
 	fs.StringVar(&resolvedAt, "resolved-at", "", "Optional RFC3339 timestamp for CROF META Resolved-At (omit for deterministic output)")
 	fs.StringVar(&supersedesCROF, "supersedes-crof", "", "Optional CID of a prior CROF this CROF supersedes (emits META Supersedes-CROF-CID)")
+	fs.StringVar(&mode, "mode", "permissive", "Compliance mode: permissive or strict")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -693,6 +760,17 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 		return 1
 	}
 
+	var opts resolver.Options
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "permissive":
+		opts.Mode = compliance.Permissive
+	case "strict":
+		opts.Mode = compliance.Strict
+	default:
+		fmt.Fprintln(errOut, "invalid --mode (expected permissive or strict)")
+		return 2
+	}
+
 	attBytes := make([][]byte, 0, len(attPaths))
 	attCIDs := make([]string, 0, len(attPaths))
 	for _, p := range attPaths {
@@ -710,7 +788,7 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 		attCIDs = append(attCIDs, a.CID())
 	}
 
-	res, err := resolver.Resolve(attBytes, policyBytes, subjectCID)
+	res, err := resolver.ResolveWithOptions(attBytes, policyBytes, subjectCID, opts)
 	if err != nil {
 		fmt.Fprintf(errOut, "resolve: %v\n", err)
 		return 1
@@ -738,6 +816,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 	var resolverID string
 	var resolvedAt string
 	var supersedesCROF string
+	var mode string
 
 	fs.StringVar(&name, "name", "", "Symbolic name")
 	fs.StringVar(&version, "version", "", "Optional version")
@@ -746,6 +825,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&resolverID, "resolver-id", "xdao-resolver-reference", "Resolver-ID recorded in CROF")
 	fs.StringVar(&resolvedAt, "resolved-at", "", "Optional RFC3339 timestamp for CROF META Resolved-At (omit for deterministic output)")
 	fs.StringVar(&supersedesCROF, "supersedes-crof", "", "Optional CID of a prior CROF this CROF supersedes (emits META Supersedes-CROF-CID)")
+	fs.StringVar(&mode, "mode", "permissive", "Compliance mode: permissive or strict")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -779,6 +859,17 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 		return 1
 	}
 
+	var opts resolver.Options
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "permissive":
+		opts.Mode = compliance.Permissive
+	case "strict":
+		opts.Mode = compliance.Strict
+	default:
+		fmt.Fprintln(errOut, "invalid --mode (expected permissive or strict)")
+		return 2
+	}
+
 	attBytes := make([][]byte, 0, len(attPaths))
 	attCIDs := make([]string, 0, len(attPaths))
 	for _, p := range attPaths {
@@ -796,7 +887,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 		attCIDs = append(attCIDs, a.CID())
 	}
 
-	nameRes, err := resolver.ResolveName(attBytes, policyBytes, name, version)
+	nameRes, err := resolver.ResolveNameWithOptions(attBytes, policyBytes, name, version, opts)
 	if err != nil {
 		fmt.Fprintf(errOut, "resolve-name: %v\n", err)
 		return 1
@@ -811,6 +902,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 		State:      nameRes.State,
 		Confidence: nameRes.Confidence,
 		Exclusions: nameRes.Exclusions,
+		Verdicts:   nameRes.Verdicts,
 	}
 	if len(nameRes.Bindings) > 0 {
 		res.Paths = append(res.Paths, resolver.Path{ID: "path-1", CIDs: append([]string(nil), nameRes.Bindings...)})

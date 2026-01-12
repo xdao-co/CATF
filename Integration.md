@@ -275,6 +275,16 @@ CLI:
   --att /tmp/r1.catf
 ```
 
+Resolver compliance mode (optional):
+
+```sh
+./bin/xdao-catf resolve \
+  --mode strict \
+  --subject "$SUBJECT_CID" \
+  --policy ./policy.tpdl \
+  --att /tmp/a1.catf
+```
+
 If you are producing a revised CROF and want to declare it supersedes a prior CROF, pass the prior CROF CID:
 
 ```sh
@@ -288,7 +298,7 @@ If you are producing a revised CROF and want to declare it supersedes a prior CR
 Go integration:
 
 ```go
-res, err := resolver.Resolve(attestationBytesList, policyBytes, subjectCID)
+res, err := resolver.ResolveWithOptions(attestationBytesList, policyBytes, subjectCID, resolver.Options{Mode: compliance.Permissive})
 if err != nil { /* handle */ }
 
 crofBytes := crof.Render(

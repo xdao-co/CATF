@@ -1274,7 +1274,7 @@ CROF MUST NOT:
 
 A CROF document is plain text with fixed sections:
 
-```
+```text
 -----BEGIN XDAO RESOLUTION-----
 META
 INPUTS
@@ -1295,7 +1295,7 @@ All sections MUST appear, even if empty.
 
 Describes the resolution event.
 
-```
+```text
 META
 Version: 1
 Spec: xdao-crof-1
@@ -1314,7 +1314,7 @@ Supersedes-CROF-CID: bafybeipriorcrof...
 
 Binds the resolution output to its inputs.
 
-```
+```text
 INPUTS
 Trust-Policy-CID: bafybeipolicy...
 Attestation-CID: bafybeiatta1...
@@ -1332,7 +1332,7 @@ Rules:
 
 Defines the resolver’s high-level conclusion.
 
-```
+```text
 RESULT
 Subject-CID: bafy-doc-1
 State: Resolved | Forked | Unresolved | Revoked
@@ -1347,7 +1347,7 @@ Confidence is advisory and policy-dependent.
 
 Enumerates trusted resolution paths.
 
-```
+```text
 PATHS
 Path-ID: primary
 Attestation-CID: bafybeiatta1...
@@ -1365,7 +1365,7 @@ Rules:
 
 Explicitly lists conflicting trusted paths.
 
-```
+```text
 FORKS
 Fork-ID: fork-1
 Conflicting-Path: primary
@@ -1380,7 +1380,7 @@ Fork absence MUST be explicit.
 
 Lists attestations excluded from trust.
 
-```
+```text
 EXCLUSIONS
 Attestation-CID: bafybeibad...
 Reason: Signature invalid
@@ -1398,7 +1398,7 @@ This section is intended for auditability: it allows downstream consumers to pre
 
 Example:
 
-```
+```text
 VERDICTS
 Attestation-CID: bafybeiatta1...
 Issuer-Key: ed25519:BASE64...
@@ -1425,7 +1425,7 @@ Rules:
 
 Binds the resolution output cryptographically.
 
-```
+```text
 CRYPTO
 Resolver-Key: ed25519:RESOLVERKEY...
 Signature-Alg: ed25519

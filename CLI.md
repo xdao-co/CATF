@@ -27,6 +27,22 @@ go run ./cmd/xdao-catf --help
 
 ## Commands
 
+### `crof`
+
+Helpers for working with CROF bytes.
+
+Compute a CROF CID from a CROF text file:
+
+```sh
+./bin/xdao-catf crof cid /path/to/out.crof
+```
+
+Validate CROF supersession semantics (new supersedes old):
+
+```sh
+./bin/xdao-catf crof validate-supersession --new /path/to/new.crof --old /path/to/old.crof
+```
+
 ### `doc-cid`
 
 Computes a stable subject CID for a file (CIDv1 `raw` + sha2-256 multihash):
@@ -167,6 +183,12 @@ Resolves a subject CID under a policy and prints canonical CROF:
 ./bin/xdao-catf resolve --subject "$SUBJECT_CID" --policy ./policy.tpdl --att /tmp/a1.catf
 ```
 
+Compliance mode:
+
+```sh
+./bin/xdao-catf resolve --mode strict --subject "$SUBJECT_CID" --policy ./policy.tpdl --att /tmp/a1.catf
+```
+
 If you are publishing a revised CROF and want to declare supersession of a prior CROF, pass its CID:
 
 ```sh
@@ -183,6 +205,12 @@ Resolves name-bindings under policy:
 
 ```sh
 ./bin/xdao-catf resolve-name --name example.com --version v1 --policy ./policy.tpdl --att /tmp/n1.catf
+```
+
+Compliance mode:
+
+```sh
+./bin/xdao-catf resolve-name --mode strict --name example.com --version v1 --policy ./policy.tpdl --att /tmp/n1.catf
 ```
 
 You can also declare CROF supersession for name resolution outputs:
