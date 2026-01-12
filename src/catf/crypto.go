@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
-	"errors"
-	"fmt"
 	"io"
 	"strings"
 
@@ -42,56 +40,56 @@ func (c *CATF) Signature() string {
 func (c *CATF) IssuerPublicKeyBytes() ([]byte, error) {
 	issuer := c.IssuerKey()
 	if issuer == "" {
-		return nil, errors.New("missing Issuer-Key")
+		return nil, newError(KindCrypto, "CATF-CRYPTO-103", "missing Issuer-Key")
 	}
 
 	alg, enc, ok := strings.Cut(issuer, ":")
 	if !ok {
-		return nil, fmt.Errorf("invalid Issuer-Key encoding: %q", issuer)
+		return nil, newError(KindCrypto, "CATF-CRYPTO-111", "invalid Issuer-Key encoding")
 	}
 	pub, err := decodeBase64(enc)
 	if err != nil {
-		return nil, fmt.Errorf("invalid issuer key base64: %w", err)
+		return nil, wrapError(KindCrypto, "CATF-CRYPTO-113", "invalid issuer key base64", err)
 	}
 
 	switch alg {
 	case "ed25519":
 		if len(pub) != ed25519.PublicKeySize {
-			return nil, fmt.Errorf("invalid ed25519 public key length: %d", len(pub))
+			return nil, newError(KindCrypto, "CATF-CRYPTO-114", "invalid ed25519 public key length")
 		}
 		return pub, nil
 	case "dilithium3":
 		var pk mode3.PublicKey
 		if err := pk.UnmarshalBinary(pub); err != nil {
-			return nil, fmt.Errorf("invalid dilithium3 public key: %w", err)
+			return nil, wrapError(KindCrypto, "CATF-CRYPTO-115", "invalid dilithium3 public key", err)
 		}
 		return pub, nil
 	default:
-		return nil, fmt.Errorf("unsupported issuer key encoding: %q", issuer)
+		return nil, newError(KindCrypto, "CATF-CRYPTO-112", "unsupported issuer key encoding")
 	}
 }
 
 func (c *CATF) SignatureBytes() ([]byte, error) {
 	s := c.Signature()
 	if s == "" {
-		return nil, errors.New("missing Signature")
+		return nil, newError(KindCrypto, "CATF-CRYPTO-104", "missing Signature")
 	}
 	sig, err := decodeBase64(s)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature base64: %w", err)
+		return nil, wrapError(KindCrypto, "CATF-CRYPTO-131", "invalid signature base64", err)
 	}
 	if c.SignatureAlg() == "" {
-		return nil, errors.New("missing Signature-Alg")
+		return nil, newError(KindCrypto, "CATF-CRYPTO-101", "missing Signature-Alg")
 	}
 	// Validate signature lengths where we can (some schemes have fixed sizes).
 	switch c.SignatureAlg() {
 	case "ed25519":
 		if len(sig) != ed25519.SignatureSize {
-			return nil, fmt.Errorf("invalid ed25519 signature length: %d", len(sig))
+			return nil, newError(KindCrypto, "CATF-CRYPTO-132", "invalid ed25519 signature length")
 		}
 	case "dilithium3":
 		if len(sig) != mode3.SignatureSize {
-			return nil, fmt.Errorf("invalid dilithium3 signature length: %d", len(sig))
+			return nil, newError(KindCrypto, "CATF-CRYPTO-133", "invalid dilithium3 signature length")
 		}
 	}
 	return sig, nil
@@ -109,7 +107,7 @@ func digestFor(hashAlg string, message []byte) ([]byte, error) {
 		s := sha3.Sum256(message)
 		return s[:], nil
 	default:
-		return nil, fmt.Errorf("unsupported Hash-Alg: %s", hashAlg)
+		return nil, newError(KindCrypto, "CATF-CRYPTO-201", "unsupported Hash-Alg")
 	}
 }
 
@@ -120,7 +118,7 @@ func digestFor(hashAlg string, message []byte) ([]byte, error) {
 // - Signature-Alg: dilithium3 (post-quantum)
 func (c *CATF) Verify() error {
 	if c == nil {
-		return errors.New("nil CATF")
+		return newError(KindCrypto, "CATF-CRYPTO-001", "nil CATF")
 	}
 	// Re-parse the receiver bytes to enforce canonicalization cannot be bypassed
 	// via a manually-constructed CATF or mutated fields.
@@ -132,22 +130,22 @@ func (c *CATF) Verify() error {
 	c = parsed
 
 	if c.SignatureAlg() == "" {
-		return errors.New("missing Signature-Alg")
+		return newError(KindCrypto, "CATF-CRYPTO-101", "missing Signature-Alg")
 	}
 	if c.HashAlg() == "" {
-		return errors.New("missing Hash-Alg")
+		return newError(KindCrypto, "CATF-CRYPTO-102", "missing Hash-Alg")
 	}
 
 	issuer := c.IssuerKey()
 	if issuer == "" {
-		return errors.New("missing Issuer-Key")
+		return newError(KindCrypto, "CATF-CRYPTO-103", "missing Issuer-Key")
 	}
 	issuerAlg, _, ok := strings.Cut(issuer, ":")
 	if !ok {
-		return fmt.Errorf("invalid Issuer-Key encoding: %q", issuer)
+		return newError(KindCrypto, "CATF-CRYPTO-111", "invalid Issuer-Key encoding")
 	}
 	if issuerAlg != c.SignatureAlg() {
-		return fmt.Errorf("Issuer-Key alg %q does not match Signature-Alg %q", issuerAlg, c.SignatureAlg())
+		return newError(KindCrypto, "CATF-CRYPTO-121", "Issuer-Key alg does not match Signature-Alg")
 	}
 
 	pub, err := c.IssuerPublicKeyBytes()
@@ -170,20 +168,20 @@ func (c *CATF) Verify() error {
 	switch c.SignatureAlg() {
 	case "ed25519":
 		if !ed25519.Verify(ed25519.PublicKey(pub), digest, sig) {
-			return errors.New("signature invalid")
+			return newError(KindCrypto, "CATF-CRYPTO-401", "signature invalid")
 		}
 		return nil
 	case "dilithium3":
 		var pk mode3.PublicKey
 		if err := pk.UnmarshalBinary(pub); err != nil {
-			return fmt.Errorf("invalid dilithium3 public key: %w", err)
+			return wrapError(KindCrypto, "CATF-CRYPTO-115", "invalid dilithium3 public key", err)
 		}
 		if !mode3.Verify(&pk, digest, sig) {
-			return errors.New("signature invalid")
+			return newError(KindCrypto, "CATF-CRYPTO-401", "signature invalid")
 		}
 		return nil
 	default:
-		return fmt.Errorf("unsupported Signature-Alg: %s", c.SignatureAlg())
+		return newError(KindCrypto, "CATF-CRYPTO-301", "unsupported Signature-Alg")
 	}
 }
 
@@ -206,7 +204,7 @@ func SignEd25519SHA256(message []byte, privateKey ed25519.PrivateKey) string {
 // hashAlg must be one of: sha256, sha512, sha3-256.
 func SignDilithium3(message []byte, hashAlg string, privateKey *mode3.PrivateKey) (string, error) {
 	if privateKey == nil {
-		return "", errors.New("missing private key")
+		return "", newError(KindCrypto, "CATF-CRYPTO-501", "missing private key")
 	}
 	digest, err := digestFor(hashAlg, message)
 	if err != nil {

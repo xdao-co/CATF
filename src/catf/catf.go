@@ -3,7 +3,6 @@ package catf
 
 import (
 	"bytes"
-	"errors"
 
 	"xdao.co/catf/cidutil"
 )
@@ -94,7 +93,7 @@ func (c *CATF) SignedBytes() []byte {
 // If the receiver does not contain canonical CATF bytes, an error is returned.
 func (c *CATF) CID() (string, error) {
 	if c == nil {
-		return "", errors.New("nil CATF")
+		return "", newError(KindCID, "CATF-CID-001", "nil CATF")
 	}
 	if _, err := Parse(c.raw); err != nil {
 		return "", err
@@ -106,7 +105,7 @@ func signedScopeFromCanonical(canonical []byte) ([]byte, error) {
 	marker := []byte("\nCRYPTO\n")
 	idx := bytes.Index(canonical, marker)
 	if idx < 0 {
-		return nil, errors.New("cannot determine signature scope")
+		return nil, newError(KindInternal, "CATF-INTERNAL-011", "cannot determine signature scope")
 	}
 	signedEnd := idx + 1
 	return canonical[:signedEnd], nil

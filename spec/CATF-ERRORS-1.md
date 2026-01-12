@@ -111,7 +111,35 @@ Within a stage, rule evaluation order MUST be deterministic (and is part of conf
 - Meaning: renderer failed for a reason not covered by a structured CATF-* rule.
 - Typical `Kind`: `Render`.
 
-## 5. Validation Rules (CATF-VAL-###)
+### CATF-CID-001 Nil receiver
+
+- Meaning: CID derivation called on a nil CATF receiver.
+- Typical `Kind`: `CID`.
+
+## 5. Crypto Rules (CATF-CRYPTO-###)
+
+Crypto RuleIDs are stable and MUST be returned for cryptographic field and verification failures.
+
+- `CATF-CRYPTO-001`: nil CATF receiver
+- `CATF-CRYPTO-101`: missing `Signature-Alg`
+- `CATF-CRYPTO-102`: missing `Hash-Alg`
+- `CATF-CRYPTO-103`: missing `Issuer-Key`
+- `CATF-CRYPTO-104`: missing `Signature`
+- `CATF-CRYPTO-111`: invalid `Issuer-Key` encoding (missing or malformed `<alg>:<base64>`)
+- `CATF-CRYPTO-112`: unsupported issuer key encoding
+- `CATF-CRYPTO-113`: invalid issuer key base64
+- `CATF-CRYPTO-114`: invalid ed25519 public key length
+- `CATF-CRYPTO-115`: invalid dilithium3 public key
+- `CATF-CRYPTO-121`: `Issuer-Key` algorithm does not match `Signature-Alg`
+- `CATF-CRYPTO-131`: invalid signature base64
+- `CATF-CRYPTO-132`: invalid ed25519 signature length
+- `CATF-CRYPTO-133`: invalid dilithium3 signature length
+- `CATF-CRYPTO-201`: unsupported `Hash-Alg`
+- `CATF-CRYPTO-301`: unsupported `Signature-Alg`
+- `CATF-CRYPTO-401`: signature invalid
+- `CATF-CRYPTO-501`: missing private key (signing helper)
+
+## 6. Validation Rules (CATF-VAL-###)
 
 The CATF v1 core claim validation rules are stable and deterministic.
 
