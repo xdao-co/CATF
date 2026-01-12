@@ -6,6 +6,11 @@
 - End-to-end workflows: [UseCases.md](UseCases.md)
 - Runnable scripts: [examples/README.md](examples/README.md)
 
+## Library notes
+
+- Spec compliance: the ReferenceDesign.md §19 test vectors run under `go test ./...`.
+- Crypto agility: CATF verification supports `Signature-Alg: ed25519 | dilithium3` and `Hash-Alg: sha256 | sha512 | sha3-256`.
+
 ## IPFS note (local vs network publishing)
 
 - The reference workflows assume your local node (e.g. an XDAO Node) has the Kubo `ipfs` CLI installed.

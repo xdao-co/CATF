@@ -137,8 +137,13 @@ Pattern:
 
 If your project already has keys (HSM, Vault, wallet, etc.), you can:
 
-- Publish issuer public keys in `TRUST` as `ed25519:<base64>`
+- Publish issuer public keys in `TRUST` as `ed25519:<base64>` or `dilithium3:<base64>`
 - Produce valid CATF attestations using the Go packages (or extend CLI integration)
+
+Notes:
+
+- `Issuer-Key` is required and is algorithm-qualified (e.g. `ed25519:...`, `dilithium3:...`).
+- `Issuer-Key` must match `Signature-Alg` (mismatches are rejected).
 
 ---
 
@@ -175,6 +180,11 @@ Require:
 -----END XDAO TRUST POLICY-----
 ```
 
+Policy parsing notes:
+
+- `META` is required and must include `Spec: xdao-tpdl-1` and `Version: 1`.
+- A single public key may appear multiple times with different `Role:` values; roles are accumulated.
+
 Quorum example:
 
 ```text
@@ -189,6 +199,7 @@ Practical guidance:
 - Treat policies as versioned configuration artifacts.
 - In production, generate policies from your application state (users/organizations/registrars) rather than hand-editing.
 - Keep the policy text canonical/stable so it can be content-addressed and audited.
+- If you use `Type=supersedes`, prefer adding `Supersedes: Allowed-By` constraints so supersedes authority is explicit.
 
 ---
 
@@ -234,6 +245,11 @@ doc.Crypto["Signature"] = sig
 finalBytes, _ := catf.Render(doc)
 ```
 
+Crypto agility notes:
+
+- Supported `Crypto` fields include `Signature-Alg` (`ed25519`, `dilithium3`) and `Hash-Alg` (`sha256`, `sha512`, `sha3-256`).
+- For `Signature-Alg=dilithium3`, signatures are computed/verified over the digest bytes of `Signed`.
+
 Operational guidance:
 
 - Store the final CATF bytes exactly (they are canonical; do not add a trailing newline).
@@ -278,6 +294,10 @@ Your application typically consumes:
 - `res.State` (Resolved / Unresolved / Forked / Revoked)
 - `res.Paths` (valid chains)
 - `res.Forks` (competing heads)
+
+Fork surfacing notes:
+
+- Forks are never silently merged. If multiple trusted candidates can satisfy a `Quorum: 1` requirement for the same `(Type, Role)`, resolution will surface competing forks.
 
 ---
 

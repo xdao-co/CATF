@@ -7,6 +7,8 @@ This repository includes a small CLI (`xdao-catf`) to exercise the system end-to
 - Evaluate attestations under a TPDL trust policy
 - Output canonical CROF resolutions
 
+Note: the Go library supports additional algorithms (e.g. `Signature-Alg=dilithium3`, `Hash-Alg=sha3-256`), but the minimal CLI currently emits `ed25519` + `sha256`.
+
 ## Where the CLI lives
 
 Build the CLI binary from the repo root:
@@ -155,6 +157,7 @@ Notes:
 - `Type=approval` requires `Effective-Date`; if omitted, the CLI fills it with `time.Now().UTC()` in RFC3339.
 - `Type=revocation` targets a prior attestation CID via `--target-attestation <AttestationCID>`.
 - `Type=supersedes` links to a prior attestation CID via `--supersedes <AttestationCID>`.
+- The CLI currently sets `Signature-Alg: ed25519` and `Hash-Alg: sha256`.
 
 ### `resolve`
 
