@@ -41,6 +41,9 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
 Experimental APIs MAY change in MINOR releases.
 They should be used with pinning and explicit upgrade review.
 
+- Package `xdao.co/catf/catf`
+  - `NormalizeCATF([]byte) ([]byte, error)` (model-first canonicalization helper)
+
 - Packages under `xdao.co/catf/internal/...`
 
 ### Internal
