@@ -9,6 +9,8 @@ META
 Version: 1
 Spec: xdao-tpdl-1
 
+Description: test
+
 TRUST
 Key: ed25519:AUTHOR_KEY
 Role: author
@@ -62,6 +64,27 @@ func TestParseInvalidTPDL_MissingPreamble(t *testing.T) {
 	_, err := Parse([]byte("META\nVersion: 1\n"))
 	if err == nil {
 		t.Error("expected error for missing preamble")
+	}
+}
+
+func TestParseInvalidTPDL_MissingMetaSpec(t *testing.T) {
+	policyText := `-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+
+TRUST
+Key: ed25519:K1
+Role: author
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+-----END XDAO TRUST POLICY-----`
+
+	_, err := Parse([]byte(policyText))
+	if err == nil {
+		t.Fatalf("expected error for missing META Spec")
 	}
 }
 

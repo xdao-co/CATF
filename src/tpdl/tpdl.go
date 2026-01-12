@@ -211,5 +211,19 @@ func Parse(data []byte) (*Policy, error) {
 	}
 	sort.Strings(allowedList)
 
+	// Spec-strict META validation (ReferenceDesign.md §16.4).
+	if meta["Spec"] == "" {
+		return nil, errors.New("missing META Spec")
+	}
+	if meta["Spec"] != "xdao-tpdl-1" {
+		return nil, errors.New("unsupported policy Spec")
+	}
+	if meta["Version"] == "" {
+		return nil, errors.New("missing META Version")
+	}
+	if meta["Version"] != "1" {
+		return nil, errors.New("unsupported policy Version")
+	}
+
 	return &Policy{Meta: meta, Trust: trust, Rules: rules, SupersedesAllowedBy: allowedList}, nil
 }

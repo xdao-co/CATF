@@ -165,7 +165,7 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 		return res, nil
 	}
 
-	paths, forks := buildPaths(activeTrustedClaims)
+	paths, forks := buildPaths(policy, activeTrustedClaims)
 	res.Paths = paths
 	res.Forks = forks
 
@@ -250,7 +250,7 @@ func rulesSatisfied(policy *tpdl.Policy, activeTrusted []*attestation) bool {
 	return true
 }
 
-func buildPaths(activeTrusted []*attestation) ([]Path, []Fork) {
+func buildPaths(policy *tpdl.Policy, activeTrusted []*attestation) ([]Path, []Fork) {
 	// Model supersession using CLAIMS: Supersedes: <CID>
 	supersedes := make(map[string]string)
 	for _, a := range activeTrusted {
@@ -305,6 +305,76 @@ func buildPaths(activeTrusted []*attestation) ([]Path, []Fork) {
 	}
 
 	// No supersession: only treat competing authorship attestations as forks.
+	// Additionally, if the trust policy requires a single attestation (Quorum=1)
+	// for a specific (Type, Role), and multiple trusted candidates exist, surface
+	// the ambiguity as a fork rather than silently combining.
+	if policy != nil {
+		type roleKey struct{ typ, role string }
+		ambiguous := make(map[roleKey][]string)
+		for _, r := range policy.Rules {
+			q := r.Quorum
+			if q < 1 {
+				q = 1
+			}
+			if q != 1 {
+				continue
+			}
+			k := roleKey{typ: r.Type, role: r.Role}
+			for _, a := range activeTrusted {
+				if a.catf.ClaimType() != r.Type {
+					continue
+				}
+				if !a.trustRoles[r.Role] {
+					continue
+				}
+				ambiguous[k] = append(ambiguous[k], a.cid)
+			}
+		}
+
+		// Pick the first ambiguous rule (deterministically) and fork only across
+		// its candidates to avoid combinatorial explosion.
+		var keys []roleKey
+		for k, cids := range ambiguous {
+			if len(cids) > 1 {
+				keys = append(keys, k)
+			}
+		}
+		if len(keys) > 0 {
+			sort.Slice(keys, func(i, j int) bool {
+				if keys[i].typ == keys[j].typ {
+					return keys[i].role < keys[j].role
+				}
+				return keys[i].typ < keys[j].typ
+			})
+			k := keys[0]
+			cands := ambiguous[k]
+			sort.Strings(cands)
+
+			candidateSet := make(map[string]bool)
+			for _, cid := range cands {
+				candidateSet[cid] = true
+			}
+			var others []string
+			for _, a := range activeTrusted {
+				if !candidateSet[a.cid] {
+					others = append(others, a.cid)
+				}
+			}
+			sort.Strings(others)
+
+			var paths []Path
+			for i, cid := range cands {
+				ids := append([]string{cid}, others...)
+				paths = append(paths, Path{ID: "path-" + itoa(i+1), CIDs: ids})
+			}
+			fork := Fork{ID: "fork-1"}
+			for _, p := range paths {
+				fork.ConflictingPath = append(fork.ConflictingPath, p.ID)
+			}
+			return paths, []Fork{fork}
+		}
+	}
+
 	var allCIDs []string
 	allAuthorship := true
 	for _, a := range activeTrusted {
