@@ -99,6 +99,14 @@ A platform for decentralized coordination based on evidence, policy, and determi
 - Spec compliance: the ReferenceDesign.md §19 test vectors run under `go test ./...`.
 - Crypto agility: CATF verification supports `Signature-Alg: ed25519 | dilithium3` and `Hash-Alg: sha256 | sha512 | sha3-256`.
 
+## Documentation sync policy
+
+When changing behavior or formats in the reference implementation:
+
+- CLI flags/outputs: update [CLI.md](CLI.md)
+- Integration-facing behavior/APIs: update [Integration.md](Integration.md)
+- Normative format rules and examples: update [ReferenceDesign.md](ReferenceDesign.md)
+
 ## IPFS note (local vs network publishing)
 
 - The reference workflows assume your local node (e.g. an XDAO Node) has the Kubo `ipfs` CLI installed.

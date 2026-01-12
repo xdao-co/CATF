@@ -105,7 +105,7 @@ Common core types (v1 patterns used by the examples/CLI):
 Typical required claims by type:
 
 - `authorship`: `Role`
-- `approval`: `Role`, and usually `Effective-Date` (the CLI fills it if omitted)
+- `approval`: `Role`, and usually `Effective-Date` (required; the reference CLI requires you to provide it)
 - `revocation`: `Target-Attestation`
 - `supersedes`: `Supersedes`
 - `name-binding`: `Name`, `Version`, `Points-To`
@@ -275,6 +275,16 @@ CLI:
   --att /tmp/r1.catf
 ```
 
+If you are producing a revised CROF and want to declare it supersedes a prior CROF, pass the prior CROF CID:
+
+```sh
+./bin/xdao-catf resolve \
+  --subject "$SUBJECT_CID" \
+  --policy ./policy.tpdl \
+  --att /tmp/a1.catf \
+  --supersedes-crof <PriorCROFCID>
+```
+
 Go integration:
 
 ```go
@@ -294,6 +304,10 @@ Your application typically consumes:
 - `res.State` (Resolved / Unresolved / Forked / Revoked)
 - `res.Paths` (valid chains)
 - `res.Forks` (competing heads)
+
+In addition, the resolver now emits per-attestation evidence as `res.Verdicts`, which the CROF renderer records in the `VERDICTS` section. This is useful for auditing *why* an attestation was excluded (untrusted, revoked, parse-failed, etc.) without re-running the resolver.
+
+The CROF `RESULT` section also records `Subject-CID` to bind the output to the subject being resolved.
 
 Fork surfacing notes:
 

@@ -65,8 +65,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  xdao-catf key list")
 	fmt.Fprintln(w, "  xdao-catf key export --name <name> [--role <role>]")
 	fmt.Fprintln(w, "  xdao-catf attest --subject <CID> --description <text> (--seed-hex <64hex> | --signer <name> [--signer-role <role>] | --key-file <path>) [--type <t>] [--role <r>] [--claim Key=Value ...]")
-	fmt.Fprintln(w, "  xdao-catf resolve --subject <CID> --policy <tpdl.txt> --att <a1.catf> [--att ...]")
-	fmt.Fprintln(w, "  xdao-catf resolve-name --name <Name> [--version <v>] --policy <tpdl.txt> --att <a1.catf> [--att ...]")
+	fmt.Fprintln(w, "  xdao-catf resolve --subject <CID> --policy <tpdl.txt> --att <a1.catf> [--att ...] [--supersedes-crof <CID>]")
+	fmt.Fprintln(w, "  xdao-catf resolve-name --name <Name> [--version <v>] --policy <tpdl.txt> --att <a1.catf> [--att ...] [--supersedes-crof <CID>]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Notes:")
 	fmt.Fprintln(w, "  - --seed-hex must be 32 bytes (64 hex chars) ed25519 seed")
@@ -76,7 +76,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "      CID=$(xdao-catf ipfs put --init <file>)")
 	fmt.Fprintln(w, "      xdao-catf doc-cid <file>  # should match CID")
 	fmt.Fprintln(w, "      ipfs block get $CID > /tmp/out && cmp <file> /tmp/out")
-	fmt.Fprintln(w, "  - approval attestations require Effective-Date; defaults to now (UTC)")
+	fmt.Fprintln(w, "  - approval attestations require Effective-Date (provide --effective-date or --claim Effective-Date=...)")
 	fmt.Fprintln(w, "  - attest writes canonical CATF bytes to stdout (no trailing newline)")
 	fmt.Fprintln(w, "  - resolve/resolve-name print canonical CROF to stdout")
 }
@@ -652,12 +652,14 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 	var attPaths stringList
 	var resolverID string
 	var resolvedAt string
+	var supersedesCROF string
 
 	fs.StringVar(&subjectCID, "subject", "", "Subject CID")
 	fs.StringVar(&policyPath, "policy", "", "TPDL policy file")
 	fs.Var(&attPaths, "att", "CATF attestation file (repeatable)")
 	fs.StringVar(&resolverID, "resolver-id", "xdao-resolver-reference", "Resolver-ID recorded in CROF")
 	fs.StringVar(&resolvedAt, "resolved-at", "", "Optional RFC3339 timestamp for CROF META Resolved-At (omit for deterministic output)")
+	fs.StringVar(&supersedesCROF, "supersedes-crof", "", "Optional CID of a prior CROF this CROF supersedes (emits META Supersedes-CROF-CID)")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -718,7 +720,7 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 		res,
 		crof.PolicyCID(policyBytes),
 		attCIDs,
-		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime},
+		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime, SupersedesCROFCID: supersedesCROF},
 	)
 
 	_, _ = out.Write(crofBytes)
@@ -735,6 +737,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 	var attPaths stringList
 	var resolverID string
 	var resolvedAt string
+	var supersedesCROF string
 
 	fs.StringVar(&name, "name", "", "Symbolic name")
 	fs.StringVar(&version, "version", "", "Optional version")
@@ -742,6 +745,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 	fs.Var(&attPaths, "att", "CATF attestation file (repeatable)")
 	fs.StringVar(&resolverID, "resolver-id", "xdao-resolver-reference", "Resolver-ID recorded in CROF")
 	fs.StringVar(&resolvedAt, "resolved-at", "", "Optional RFC3339 timestamp for CROF META Resolved-At (omit for deterministic output)")
+	fs.StringVar(&supersedesCROF, "supersedes-crof", "", "Optional CID of a prior CROF this CROF supersedes (emits META Supersedes-CROF-CID)")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -819,7 +823,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 		res,
 		crof.PolicyCID(policyBytes),
 		attCIDs,
-		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime},
+		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime, SupersedesCROFCID: supersedesCROF},
 	)
 	_, _ = out.Write(crofBytes)
 	return 0

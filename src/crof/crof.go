@@ -29,6 +29,10 @@ type RenderOptions struct {
 	ResolverID string
 	ResolvedAt time.Time // informational only; zero means omit
 
+	// Optional CROF supersession.
+	// If set, the CROF asserts it supersedes a prior CROF identified by CID.
+	SupersedesCROFCID string
+
 	// Optional CROF signing. If PrivateKey is set, the output will include a CRYPTO
 	// section populated and Signature computed over the CROF bytes excluding the
 	// Signature: line.
@@ -61,6 +65,9 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	if !opts.ResolvedAt.IsZero() {
 		metaLines = append(metaLines, "Resolved-At: "+opts.ResolvedAt.UTC().Format(time.RFC3339))
 	}
+	if opts.SupersedesCROFCID != "" {
+		metaLines = append(metaLines, "Supersedes-CROF-CID: "+opts.SupersedesCROFCID)
+	}
 	sort.Strings(metaLines)
 	for _, l := range metaLines {
 		sb.WriteString(l)
@@ -83,6 +90,7 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	// RESULT
 	sb.WriteString("RESULT\n")
 	resultLines := []string{
+		"Subject-CID: " + res.SubjectCID,
 		"Confidence: " + string(res.Confidence),
 		"State: " + string(res.State),
 	}

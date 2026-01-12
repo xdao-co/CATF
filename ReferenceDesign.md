@@ -1282,6 +1282,7 @@ RESULT
 PATHS
 FORKS
 EXCLUSIONS
+VERDICTS
 CRYPTO
 -----END XDAO RESOLUTION-----
 ```
@@ -1300,9 +1301,12 @@ Version: 1
 Spec: xdao-crof-1
 Resolver-ID: xdao-resolver-reference
 Resolved-At: 2026-01-10T03:12:00Z
+Supersedes-CROF-CID: bafybeipriorcrof...
 ```
 
 `Resolved-At` is informational only.
+
+`Supersedes-CROF-CID` is optional. If present, it declares that this CROF supersedes a prior CROF by CID.
 
 ---
 
@@ -1330,6 +1334,7 @@ Defines the resolver’s high-level conclusion.
 
 ```
 RESULT
+Subject-CID: bafy-doc-1
 State: Resolved | Forked | Unresolved | Revoked
 Confidence: High | Medium | Low | Undefined
 ```
@@ -1385,7 +1390,38 @@ Reasons MUST be explicit and textual.
 
 ---
 
-## 17.9 CRYPTO Section
+## 17.9 VERDICTS Section
+
+Lists per-attestation evidence that explains how each attestation was handled (trusted, revoked, excluded).
+
+This section is intended for auditability: it allows downstream consumers to preserve a deterministic explanation alongside the final result.
+
+Example:
+
+```
+VERDICTS
+Attestation-CID: bafybeiatta1...
+Issuer-Key: ed25519:BASE64...
+Claim-Type: authorship
+Trusted: true
+Revoked: false
+Trust-Role: author
+
+Attestation-CID: bafybeibad...
+Trusted: false
+Revoked: false
+Excluded-Reason: signature invalid
+```
+
+Rules:
+
+* If present, `Attestation-CID` identifies the attestation being described.
+* `Trusted` and `Revoked` MUST be explicit (`true`/`false`).
+* `Excluded-Reason` is optional; if present it MUST be human-readable text.
+
+---
+
+## 17.10 CRYPTO Section
 
 Binds the resolution output cryptographically.
 
@@ -1401,17 +1437,18 @@ The signature covers the entire CROF document excluding the `Signature:` line.
 
 ---
 
-## 17.10 Determinism Requirements
+## 17.11 Determinism Requirements
 
 Resolvers MUST:
 
 * Canonicalize CROF output deterministically
 * Produce identical CROF bytes for identical inputs
 * Include all forks and exclusions
+* If `VERDICTS` are emitted, their ordering MUST be deterministic
 
 ---
 
-## 17.11 CROF as Evidence
+## 17.12 CROF as Evidence
 
 CROF documents:
 
@@ -1424,7 +1461,7 @@ CROF does not replace attestations; it records interpretation.
 
 ---
 
-## 17.12 Non-Goals of CROF
+## 17.13 Non-Goals of CROF
 
 CROF MUST NOT:
 
