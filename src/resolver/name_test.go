@@ -100,3 +100,26 @@ func TestResolveName_SupersededBindingChoosesHead(t *testing.T) {
 		t.Fatalf("expected 1 head binding, got %d", len(res.Bindings))
 	}
 }
+
+func TestResolveName_EnforcesPolicyQuorumForNameBinding(t *testing.T) {
+	pub, priv := mustKeypair(t, 0xF4)
+	binding := mustAttestation(t, "bafy-name-record", "Name record", map[string]string{
+		"Name":      "contracts.realestate.123-main-st",
+		"Points-To": "bafy-doc-1",
+		"Type":      "name-binding",
+		"Version":   "final",
+	}, issuerKey(pub), priv)
+
+	policy := trustPolicy(
+		[]trustEntry{{issuerKey(pub), "registrar"}},
+		[]requireRule{{typ: "name-binding", role: "registrar", quorum: 2}},
+	)
+
+	res, err := ResolveName([][]byte{binding}, []byte(policy), "contracts.realestate.123-main-st", "final")
+	if err != nil {
+		t.Fatalf("ResolveName error: %v", err)
+	}
+	if res.State != StateUnresolved {
+		t.Fatalf("expected Unresolved (quorum not met), got %s", res.State)
+	}
+}

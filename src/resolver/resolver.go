@@ -329,6 +329,59 @@ func rulesSatisfied(policy *tpdl.Policy, activeTrusted []*attestation) bool {
 	return true
 }
 
+func rulesSatisfiedForType(policy *tpdl.Policy, activeTrusted []*attestation, typ string) bool {
+	if policy == nil || len(policy.Rules) == 0 {
+		return true
+	}
+	relevant := false
+	for _, r := range policy.Rules {
+		if r.Type == typ {
+			relevant = true
+			break
+		}
+	}
+	if !relevant {
+		return true
+	}
+
+	typeRoleToKeys := make(map[string]map[string]bool)
+	for _, a := range activeTrusted {
+		if a.catf.ClaimType() != typ {
+			continue
+		}
+		issuer := a.catf.IssuerKey()
+		for role := range a.trustRoles {
+			key := typ + "|" + role
+			m := typeRoleToKeys[key]
+			if m == nil {
+				m = make(map[string]bool)
+				typeRoleToKeys[key] = m
+			}
+			m[issuer] = true
+		}
+	}
+
+	for _, r := range policy.Rules {
+		if r.Type != typ {
+			continue
+		}
+		q := r.Quorum
+		if q < 1 {
+			q = 1
+		}
+		key := r.Type + "|" + r.Role
+		m := typeRoleToKeys[key]
+		count := 0
+		for range m {
+			count++
+		}
+		if count < q {
+			return false
+		}
+	}
+	return true
+}
+
 func buildPaths(policy *tpdl.Policy, activeTrusted []*attestation) ([]Path, []Fork) {
 	// Model supersession using CLAIMS: Supersedes: <CID>
 	supersedes := make(map[string]string)

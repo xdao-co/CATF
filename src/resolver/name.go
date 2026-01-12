@@ -163,6 +163,15 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 		return res, nil
 	}
 
+	// Apply trust policy quorum/role requirements to name-binding evidence.
+	// Without this, name resolution could incorrectly resolve with insufficient
+	// trusted issuers for the required roles.
+	if !rulesSatisfiedForType(policy, candidates, "name-binding") {
+		res.State = StateUnresolved
+		res.Confidence = ConfidenceUndefined
+		return res, nil
+	}
+
 	// Construct supersession DAG among name-bindings.
 	// A name-binding may optionally include CLAIMS: Supersedes: <CID> to supersede an older binding.
 	supersedes := make(map[string]string)
