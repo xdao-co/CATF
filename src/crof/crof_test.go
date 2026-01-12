@@ -73,3 +73,15 @@ func TestRender_SignsWhenKeyProvided(t *testing.T) {
 		t.Fatalf("signature did not verify")
 	}
 }
+
+func TestRender_PanicsOnInvalidPrivateKeyLength(t *testing.T) {
+	defer func() {
+		rec := recover()
+		if rec == nil {
+			t.Fatalf("expected panic")
+		}
+	}()
+
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	_ = Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: "ed25519:AA==", PrivateKey: ed25519.PrivateKey{0x01}})
+}

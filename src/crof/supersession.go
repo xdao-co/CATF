@@ -26,13 +26,28 @@ func SupersedesCROFCID(crofBytes []byte) (string, bool, error) {
 // - B and A use the same Resolver-ID
 // - B and A use the same Trust-Policy-CID
 func ValidateSupersession(newCROF, oldCROF []byte) error {
-	oldCID := CID(oldCROF)
-	newCID := CID(newCROF)
+	oldCanon, err := CanonicalizeCROF(oldCROF)
+	if err != nil {
+		return fmt.Errorf("supersession invalid: old CROF not canonical: %w", err)
+	}
+	newCanon, err := CanonicalizeCROF(newCROF)
+	if err != nil {
+		return fmt.Errorf("supersession invalid: new CROF not canonical: %w", err)
+	}
+
+	oldCID, err := CID(oldCanon)
+	if err != nil {
+		return err
+	}
+	newCID, err := CID(newCanon)
+	if err != nil {
+		return err
+	}
 	if newCID == oldCID {
 		return errors.New("supersession invalid: new CROF bytes identical to old")
 	}
 
-	sup, ok, err := SupersedesCROFCID(newCROF)
+	sup, ok, err := SupersedesCROFCID(newCanon)
 	if err != nil {
 		return err
 	}
@@ -43,11 +58,11 @@ func ValidateSupersession(newCROF, oldCROF []byte) error {
 		return fmt.Errorf("supersession invalid: Supersedes-CROF-CID=%q does not match old CID=%q", sup, oldCID)
 	}
 
-	oldSubject, err := requiredFieldFromSection(oldCROF, "RESULT", "Subject-CID")
+	oldSubject, err := requiredFieldFromSection(oldCanon, "RESULT", "Subject-CID")
 	if err != nil {
 		return err
 	}
-	newSubject, err := requiredFieldFromSection(newCROF, "RESULT", "Subject-CID")
+	newSubject, err := requiredFieldFromSection(newCanon, "RESULT", "Subject-CID")
 	if err != nil {
 		return err
 	}
@@ -55,11 +70,11 @@ func ValidateSupersession(newCROF, oldCROF []byte) error {
 		return fmt.Errorf("supersession invalid: subject mismatch old=%q new=%q", oldSubject, newSubject)
 	}
 
-	oldResolverID, err := requiredFieldFromSection(oldCROF, "META", "Resolver-ID")
+	oldResolverID, err := requiredFieldFromSection(oldCanon, "META", "Resolver-ID")
 	if err != nil {
 		return err
 	}
-	newResolverID, err := requiredFieldFromSection(newCROF, "META", "Resolver-ID")
+	newResolverID, err := requiredFieldFromSection(newCanon, "META", "Resolver-ID")
 	if err != nil {
 		return err
 	}
@@ -67,11 +82,11 @@ func ValidateSupersession(newCROF, oldCROF []byte) error {
 		return fmt.Errorf("supersession invalid: resolver-id mismatch old=%q new=%q", oldResolverID, newResolverID)
 	}
 
-	oldPolicy, err := requiredFieldFromSection(oldCROF, "INPUTS", "Trust-Policy-CID")
+	oldPolicy, err := requiredFieldFromSection(oldCanon, "INPUTS", "Trust-Policy-CID")
 	if err != nil {
 		return err
 	}
-	newPolicy, err := requiredFieldFromSection(newCROF, "INPUTS", "Trust-Policy-CID")
+	newPolicy, err := requiredFieldFromSection(newCanon, "INPUTS", "Trust-Policy-CID")
 	if err != nil {
 		return err
 	}

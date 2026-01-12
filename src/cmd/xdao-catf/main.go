@@ -108,7 +108,12 @@ func cmdCROF(args []string, out io.Writer, errOut io.Writer) int {
 			fmt.Fprintf(errOut, "read crof: %v\n", err)
 			return 1
 		}
-		_, _ = fmt.Fprintln(out, crof.CID(b))
+		cid, err := crof.CID(b)
+		if err != nil {
+			fmt.Fprintf(errOut, "invalid crof: %v\n", err)
+			return 1
+		}
+		_, _ = fmt.Fprintln(out, cid)
 		return 0
 	case "validate-supersession":
 		fs := flag.NewFlagSet("crof validate-supersession", flag.ContinueOnError)

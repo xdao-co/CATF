@@ -247,15 +247,19 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 
 	if len(opts.PrivateKey) > 0 && opts.ResolverKey != "" {
 		sig, err := signCROF(out, opts.PrivateKey)
-		if err == nil {
-			out = []byte(strings.Replace(string(out), "Signature: 0", "Signature: "+sig, 1))
+		if err != nil {
+			panic("crof: signing requested but failed: " + err.Error())
 		}
+		out = []byte(strings.Replace(string(out), "Signature: 0", "Signature: "+sig, 1))
 	}
 
 	return out
 }
 
 func signCROF(crofBytes []byte, privateKey ed25519.PrivateKey) (string, error) {
+	if len(privateKey) != ed25519.PrivateKeySize {
+		return "", errors.New("invalid ed25519 private key length")
+	}
 	scope, err := crofSignatureScope(crofBytes)
 	if err != nil {
 		return "", err
