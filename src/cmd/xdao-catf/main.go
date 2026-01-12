@@ -809,13 +809,17 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 		return 1
 	}
 
-	crofBytes := crof.Render(
+	crofBytes, err := crof.RenderWithCompliance(
 		res,
 		crof.PolicyCID(policyBytes),
 		attCIDs,
 		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime, SupersedesCROFCID: supersedesCROF},
+		opts.Mode,
 	)
-
+	if err != nil {
+		fmt.Fprintf(errOut, "crof: %v\n", err)
+		return 1
+	}
 	_, _ = out.Write(crofBytes)
 	return 0
 }
@@ -931,12 +935,17 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 		res.Forks = append(res.Forks, resolver.Fork{ID: "fork-1", ConflictingPath: []string{"path-1"}})
 	}
 
-	crofBytes := crof.Render(
+	crofBytes, err := crof.RenderWithCompliance(
 		res,
 		crof.PolicyCID(policyBytes),
 		attCIDs,
 		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime, SupersedesCROFCID: supersedesCROF},
+		opts.Mode,
 	)
+	if err != nil {
+		fmt.Fprintf(errOut, "crof: %v\n", err)
+		return 1
+	}
 	_, _ = out.Write(crofBytes)
 	return 0
 }

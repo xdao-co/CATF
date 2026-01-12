@@ -6,11 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"xdao.co/catf/cidutil"
+	"xdao.co/catf/compliance"
 	"xdao.co/catf/resolver"
 )
 
@@ -254,6 +256,31 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	}
 
 	return out
+}
+
+// RenderWithCompliance renders CROF and enforces compliance-mode constraints.
+//
+// In strict mode, this rejects ambiguous outputs (forks/exclusions/non-resolved)
+// and disallows non-deterministic fields like Resolved-At.
+func RenderWithCompliance(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []string, opts RenderOptions, mode compliance.ComplianceMode) ([]byte, error) {
+	if mode == compliance.Strict {
+		if res == nil {
+			return nil, errors.New("strict mode: nil resolution")
+		}
+		if len(res.Exclusions) > 0 {
+			return nil, fmt.Errorf("strict mode: exclusions present (%d)", len(res.Exclusions))
+		}
+		if len(res.Forks) > 0 {
+			return nil, fmt.Errorf("strict mode: forks present (%d)", len(res.Forks))
+		}
+		if res.State != resolver.StateResolved {
+			return nil, fmt.Errorf("strict mode: expected StateResolved, got %s", res.State)
+		}
+		if !opts.ResolvedAt.IsZero() {
+			return nil, errors.New("strict mode: Resolved-At not permitted")
+		}
+	}
+	return Render(res, trustPolicyCID, attestationCIDs, opts), nil
 }
 
 func signCROF(crofBytes []byte, privateKey ed25519.PrivateKey) (string, error) {
