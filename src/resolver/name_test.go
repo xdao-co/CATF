@@ -123,3 +123,53 @@ func TestResolveName_EnforcesPolicyQuorumForNameBinding(t *testing.T) {
 		t.Fatalf("expected Unresolved (quorum not met), got %s", res.State)
 	}
 }
+
+func TestResolveName_UntrustedBindingIsExcludedAndNotSelected(t *testing.T) {
+	trustedPub, trustedPriv := mustKeypair(t, 0xF5)
+	attackerPub, attackerPriv := mustKeypair(t, 0xF6)
+
+	trustedIssuer := issuerKey(trustedPub)
+	attackerIssuer := issuerKey(attackerPub)
+
+	trusted := mustAttestation(t, "bafy-name-record", "Name record", map[string]string{
+		"Name":      "contracts.realestate.123-main-st",
+		"Points-To": "bafy-doc-1",
+		"Type":      "name-binding",
+		"Version":   "final",
+	}, trustedIssuer, trustedPriv)
+
+	attacker := mustAttestation(t, "bafy-name-record", "Name record", map[string]string{
+		"Name":      "contracts.realestate.123-main-st",
+		"Points-To": "bafy-doc-evil",
+		"Type":      "name-binding",
+		"Version":   "final",
+	}, attackerIssuer, attackerPriv)
+
+	policy := trustPolicy(
+		[]trustEntry{{trustedIssuer, "registrar"}},
+		[]requireRule{{typ: "name-binding", role: "registrar", quorum: 1}},
+	)
+
+	res, err := ResolveName([][]byte{trusted, attacker}, []byte(policy), "contracts.realestate.123-main-st", "final")
+	if err != nil {
+		t.Fatalf("ResolveName error: %v", err)
+	}
+	if res.State != StateResolved {
+		t.Fatalf("expected Resolved, got %s", res.State)
+	}
+	if res.PointsTo != "bafy-doc-1" {
+		t.Fatalf("expected PointsTo bafy-doc-1, got %s", res.PointsTo)
+	}
+
+	attackerCID := catfMustCID(t, attacker)
+	found := false
+	for _, e := range res.Exclusions {
+		if e.CID == attackerCID && e.Reason == "Issuer not trusted" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected attacker exclusion, got %+v", res.Exclusions)
+	}
+}

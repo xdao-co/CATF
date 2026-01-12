@@ -98,6 +98,51 @@ func TestResolve_SupersedesDisallowedByPolicyIsExcluded(t *testing.T) {
 	}
 }
 
+func TestResolve_SupersedesCompetingHeadsSurfaceFork(t *testing.T) {
+	subject := "bafy-doc-supersedes-competing"
+
+	pubA, privA := mustKeypair(t, 0x33)
+	pubB, privB := mustKeypair(t, 0x34)
+	pubC, privC := mustKeypair(t, 0x35)
+	issuerA := issuerKey(pubA)
+	issuerB := issuerKey(pubB)
+	issuerC := issuerKey(pubC)
+
+	base := mustAttestation(t, subject, "Paper", map[string]string{
+		"Role": "author",
+		"Type": "authorship",
+	}, issuerA, privA)
+	baseCID := catfMustCID(t, base)
+
+	s1 := mustAttestation(t, subject, "Paper", map[string]string{
+		"Supersedes": baseCID,
+		"Type":       "supersedes",
+	}, issuerB, privB)
+	s2 := mustAttestation(t, subject, "Paper", map[string]string{
+		"Supersedes": baseCID,
+		"Type":       "supersedes",
+	}, issuerC, privC)
+
+	policy := trustPolicy(
+		[]trustEntry{{issuerA, "author"}, {issuerB, "editor"}, {issuerC, "editor"}},
+		nil,
+	)
+
+	res, err := Resolve([][]byte{base, s1, s2}, []byte(policy), subject)
+	if err != nil {
+		t.Fatalf("Resolve error: %v", err)
+	}
+	if res.State != StateForked {
+		t.Fatalf("expected Forked, got %s", res.State)
+	}
+	if len(res.Paths) != 2 {
+		t.Fatalf("expected 2 paths, got %d", len(res.Paths))
+	}
+	if len(res.Forks) != 1 {
+		t.Fatalf("expected 1 fork, got %d", len(res.Forks))
+	}
+}
+
 func catfMustCID(t *testing.T, attBytes []byte) string {
 	t.Helper()
 	a, err := catf.Parse(attBytes)
