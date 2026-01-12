@@ -139,7 +139,46 @@ Names never replace CIDs as authority.
 
 ---
 
-## 2.4 CATF Canonical Serialization Rules (Normative)
+## 2.4 CID Derivation Rules (Normative)
+
+This section defines the **exact CID parameters** used by the v1 reference design.
+
+All CIDs in CATF ecosystems MUST be derived as:
+
+* CID version: **CIDv1**
+* Multicodec: **raw**
+* Multihash: **sha2-256** (32-byte digest)
+* String encoding: the standard CID string form as produced by IPFS CID libraries (typically multibase base32 with `bafy...` prefix)
+
+### 2.4.1 Document CID
+
+A *Document CID* identifies the canonical bytes of a subject artifact (PDF, text, exported dataset, etc.).
+
+Normative rule:
+
+* A Document CID MUST be the CIDv1(raw, sha2-256) of the **exact subject bytes** the integration has defined as canonical.
+
+Note: If an integration uses a structured format (e.g. JSON), it SHOULD define a deterministic serialization (stable key ordering, stable whitespace rules, fixed encoding) before hashing.
+
+### 2.4.2 Attestation CID (CATF)
+
+An *Attestation CID* identifies a CATF attestation.
+
+Normative rule:
+
+* An Attestation CID MUST be the CIDv1(raw, sha2-256) of the **canonical CATF bytes** (as defined by §2.5).
+
+### 2.4.3 Resolver Output CID (CROF)
+
+A *CROF CID* identifies a resolver output document.
+
+Normative rule:
+
+* A CROF CID MUST be the CIDv1(raw, sha2-256) of the **canonical CROF bytes** (as defined by §17).
+
+---
+
+## 2.5 CATF Canonical Serialization Rules (Normative)
 
 This section defines the **byte-level canonicalization rules** for CATF. These rules are mandatory to ensure deterministic hashing and signing across independent implementations.
 
@@ -179,6 +218,30 @@ through the end of the `CLAIMS` section, inclusive.
 
 The `Signature:` line itself MUST NOT be included in the signed material.
 
+### Cryptographic Algorithms (Normative)
+
+CATF supports cryptographic agility via the `CRYPTO` section.
+
+Normative requirements:
+
+* `Issuer-Key` MUST be algorithm-qualified as `<alg>:<base64>`, where `<base64>` is the raw public key bytes encoded as base64.
+* `Signature-Alg` MUST equal the `<alg>` prefix of `Issuer-Key`.
+* `Hash-Alg` defines the message digest used for signing.
+* Verification MUST compute `digest = Hash-Alg(SignedBytes)` and verify the signature over `digest` (not over the raw `SignedBytes`).
+
+Baseline interoperability requirement:
+
+* All v1 implementations MUST support `Signature-Alg: ed25519` with `Hash-Alg: sha256`.
+
+Additional algorithms (optional in v1 reference implementation):
+
+* `Hash-Alg`: `sha256`, `sha512`, `sha3-256`
+* `Signature-Alg`: `ed25519`, `dilithium3`
+
+Versioning guidance:
+
+* Adding new `Hash-Alg` or `Signature-Alg` identifiers changes what inputs are verifiable and therefore MUST be treated as a compatibility-sensitive change. New algorithms MAY be added in a backward-compatible way only if existing verifiers can safely reject unknown algorithms and the baseline (`ed25519` + `sha256`) remains valid and supported.
+
 ---
 
 ---
@@ -217,7 +280,7 @@ Asserts replacement of prior CID.
 Required claims:
 
 * Type: supersedes
-* Supersedes: <CID>
+* Supersedes: CID
 
 ---
 
@@ -228,7 +291,7 @@ Withdraws trust from a prior attestation.
 Required claims:
 
 * Type: revocation
-* Target-Attestation: <CID>
+* Target-Attestation: CID
 
 ---
 
@@ -241,7 +304,7 @@ Required claims:
 * Type: name-binding
 * Name
 * Version
-* Points-To: <CID>
+* Points-To: CID
 
 ---
 
@@ -387,12 +450,12 @@ If any of these guardrails are violated, CATF **ceases to be civilization-grade*
 
 #### G1 — CATF Is the Canonical Truth
 
-**MUST**
+**MUST:**
 
 * CATF is the authoritative, canonical representation of an attestation.
 * Any other representation (JSON, CBOR, YAML, database rows, APIs) is a *projection*.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No system may claim validity that cannot be derived from CATF.
 * No signature may apply only to a non-CATF representation.
@@ -404,12 +467,12 @@ Truth must not depend on tooling.
 
 #### G2 — Hashes and Signatures Bind CATF, Not Projections
 
-**MUST**
+**MUST:**
 
 * Cryptographic hashes and signatures MUST be computed over the canonical CATF byte sequence.
 * CATF canonicalization rules MUST produce identical bytes across independent implementations.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No signing of “equivalent JSON”
 * No signing of internal object models
@@ -423,11 +486,11 @@ Independent civilizations must converge on the same bytes.
 
 #### G3 — Human-Legible Without External References
 
-**MUST**
+**MUST:**
 
 * Every CATF document MUST be semantically understandable by a literate human without schemas, URLs, or software.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No required external schema
 * No required network access
@@ -440,12 +503,12 @@ Meaning must survive machine loss.
 
 #### G4 — Print-Safe and Transcribable
 
-**MUST**
+**MUST:**
 
 * CATF MUST be representable entirely as plain text.
 * Errors MUST degrade locally (line-level), not globally.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No indentation-sensitive meaning
 * No whitespace-depth semantics
@@ -460,13 +523,13 @@ CATF must survive paper, OCR, and manual transcription.
 
 #### G5 — Explicitness Over Convenience
 
-**MUST**
+**MUST:**
 
 * All semantics MUST be explicit key–value pairs.
 * No implicit defaults.
 * No inferred meaning from omission.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No positional semantics
 * No schema-defined hidden behavior
@@ -478,13 +541,13 @@ Implicit meaning is the first casualty of civilizational decay.
 
 #### G6 — Deterministic Ordering Is Mandatory
 
-**MUST**
+**MUST:**
 
 * Section order is fixed.
 * Key ordering within sections is fixed and specified.
 * Canonical spacing and line endings are fixed.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No implementation-defined ordering
 * No locale-dependent formatting
@@ -498,12 +561,12 @@ Canonical truth requires canonical bytes.
 
 #### G7 — Cryptography Is Evidence, Not Meaning
 
-**MUST**
+**MUST:**
 
 * Cryptographic material MUST be isolated in a `CRYPTO` section.
 * Loss or deprecation of cryptography MUST NOT erase semantic meaning.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No semantic claims encoded only in cryptographic structures
 * No “magic meaning” derived from algorithms
@@ -515,12 +578,12 @@ Crypto ages. Meaning must not.
 
 #### G8 — Cryptographic Agility Is Mandatory
 
-**MUST**
+**MUST:**
 
 * CATF MUST support re-attestation and cross-signing.
 * CATF MUST allow multiple attestations over the same subject.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No assumption of permanent algorithms
 * No single-signature finality model
@@ -534,11 +597,11 @@ Civilizations outlive cryptosystems.
 
 #### G9 — No Global Root of Authority
 
-**MUST**
+**MUST:**
 
 * CATF MUST NOT depend on any global registry, root key, or centralized authority.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No ICANN-like root
 * No hardcoded trust anchors
@@ -550,12 +613,12 @@ Global roots are political failure points.
 
 #### G10 — Authority Is Always Explicit
 
-**MUST**
+**MUST:**
 
 * Every attestation MUST explicitly state its issuer identity.
 * Trust decisions MUST be external to CATF (policy-based).
 
-**MUST NOT**
+**MUST NOT:**
 
 * No implied authority
 * No default trust assumptions
@@ -569,11 +632,11 @@ Authority is contextual, not universal.
 
 #### G11 — Forks Are First-Class and Preserved
 
-**MUST**
+**MUST:**
 
 * CATF MUST allow multiple valid, conflicting attestations to coexist.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No silent overwrites
 * No forced convergence
@@ -585,7 +648,7 @@ Civilizations disagree. Systems must remember that.
 
 #### G12 — Resolution Is External and Recomputable
 
-**MUST**
+**MUST:**
 
 * CATF MUST NOT encode final resolution logic.
 * Resolution MUST be a deterministic function of:
@@ -594,7 +657,7 @@ Civilizations disagree. Systems must remember that.
   * trust policy
   * optional context (time, jurisdiction, role)
 
-**MUST NOT**
+**MUST NOT:**
 
 * No embedded consensus outcomes
 * No irreversible “final state”
@@ -608,12 +671,12 @@ Truth evolves as evidence accumulates.
 
 #### G13 — Names Are Advisory, Never Authoritative
 
-**MUST**
+**MUST:**
 
 * Symbolic names MUST resolve to CIDs via attestations.
 * CIDs remain the ultimate authority.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No name-only references
 * No name-based truth claims
@@ -625,12 +688,12 @@ Names rot. Hashes endure.
 
 #### G14 — Name Records Are Attestations
 
-**MUST**
+**MUST:**
 
 * All name bindings MUST themselves be CATF attestations.
 * Name supersession MUST be explicit.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No implicit TTL
 * No mutable registries without attestations
@@ -644,12 +707,12 @@ Discovery must be auditable.
 
 #### G15 — CATF Is Self-Describing
 
-**MUST**
+**MUST:**
 
 * The CATF specification itself MUST be archivable as plain text.
 * A future implementer MUST be able to reconstruct the system from the spec alone.
 
-**MUST NOT**
+**MUST NOT:**
 
 * No reliance on living websites
 * No “see online documentation” dependencies
@@ -868,7 +931,7 @@ All compliant resolvers MUST produce an identical resolved output `R`.
 
 Formally:
 
-```
+```text
 ∀ r1, r2 ∈ Resolvers,
 Resolve(r1, A, P, C) = Resolve(r2, A, P, C)
 ```
@@ -879,7 +942,7 @@ Resolve(r1, A, P, C) = Resolve(r2, A, P, C)
 
 A resolver MUST behave as a **pure function**:
 
-```
+```text
 Resolve : (A, P, C) → R
 ```
 
@@ -915,7 +978,7 @@ These steps guarantee a stable, ordered input domain.
 The attestation DAG MUST be constructed deterministically:
 
 * Nodes sorted lexicographically by CID
-* Edges derived only from explicit references (`Supersedes`, `Parents`)
+* Edges derived only from explicit references (`Supersedes`, `Target-Attestation`)
 * No inferred or implicit edges allowed
 
 Graph construction MUST yield an identical structure across implementations.
@@ -944,7 +1007,7 @@ Trust evaluation MUST be:
 
 For any attestation `a ∈ A`:
 
-```
+```text
 Trusted(a) ∈ {true, false}
 ```
 
@@ -1079,7 +1142,7 @@ TPDL expresses these rules declaratively.
 
 A TPDL document is plain text with fixed sections:
 
-```
+```text
 -----BEGIN XDAO TRUST POLICY-----
 META
 TRUST
@@ -1093,7 +1156,7 @@ RULES
 
 Describes the policy itself.
 
-```
+```text
 META
 Version: 1
 Spec: xdao-tpdl-1
@@ -1106,7 +1169,7 @@ Description: Iowa real estate purchase agreement policy
 
 Defines trusted identities and roles.
 
-```
+```text
 TRUST
 Key: ed25519:BUYER_KEY
 Role: buyer
@@ -1132,7 +1195,7 @@ Defines evaluation rules.
 
 ### 16.6.1 Require Rules
 
-```
+```text
 RULES
 Require:
   Type: approval
@@ -1156,7 +1219,7 @@ Semantics:
 
 ### 16.6.2 Quorum Rules (Optional)
 
-```
+```text
 Require:
   Type: approval
   Role: board-member
@@ -1171,7 +1234,7 @@ Semantics:
 
 ### 16.6.3 Supersession Rules
 
-```
+```text
 Supersedes:
   Allowed-By: buyer, seller
 ```
@@ -1461,7 +1524,31 @@ CROF does not replace attestations; it records interpretation.
 
 ---
 
-## 17.13 Non-Goals of CROF
+## 17.13 CROF Supersession Semantics (Normative)
+
+CROF is evidence. A later resolver run may produce a revised CROF that is intended to supersede a prior CROF (for example: new attestations arrived, a policy changed, a bug was fixed, or a resolver was upgraded).
+
+Supersession is an explicit, CID-addressed declaration recorded in:
+
+* `META: Supersedes-CROF-CID: CID`
+
+Normative validity rules for “new CROF `B` supersedes old CROF `A`”:
+
+1. `B` MUST include exactly one `META: Supersedes-CROF-CID` value.
+2. `Supersedes-CROF-CID` MUST equal `CID(A)` (as defined by §2.4.3).
+3. `CID(B)` MUST NOT equal `CID(A)` (byte-identical CROF bytes cannot supersede themselves).
+4. `RESULT: Subject-CID` MUST match between `A` and `B`.
+5. `META: Resolver-ID` MUST match between `A` and `B`.
+6. `INPUTS: Trust-Policy-CID` MUST match between `A` and `B`.
+
+Notes:
+
+* `Resolved-At` is informational; it MAY differ between `A` and `B` and does not affect supersession validity.
+* Supersession does not imply that the older CROF is “invalid”; it is a newer statement of interpretation.
+
+---
+
+## 17.14 Non-Goals of CROF
 
 CROF MUST NOT:
 
@@ -1503,7 +1590,7 @@ Test vectors are intentionally small, explicit, and boring.
 
 #### CATF Attestation A1 (Authorship)
 
-```
+```text
 -----BEGIN XDAO ATTESTATION-----
 META
 Version: 1
@@ -1525,9 +1612,9 @@ Signature: SIG_A1
 -----END XDAO ATTESTATION-----
 ```
 
-#### Trust Policy
+#### Trust Policy (Vector 1)
 
-```
+```text
 -----BEGIN XDAO TRUST POLICY-----
 META
 Version: 1
@@ -1544,7 +1631,7 @@ Require:
 -----END XDAO TRUST POLICY-----
 ```
 
-#### Expected CROF Summary
+#### Expected CROF Summary (Vector 1)
 
 * State: `Resolved`
 * Paths: 1
@@ -1557,18 +1644,18 @@ Require:
 
 **Scenario**: Two trusted authors publish competing revisions without supersession.
 
-#### CATF Attestations
+#### CATF Attestations (Vector 2)
 
 * A1: Authorship by AUTHOR_A
 * A2: Authorship by AUTHOR_B
 
 Both reference the same parent document.
 
-#### Trust Policy
+#### Trust Policy (Vector 2)
 
 * AUTHOR_A and AUTHOR_B trusted as authors
 
-#### Expected CROF Summary
+#### Expected CROF Summary (Vector 2)
 
 * State: `Forked`
 * Paths: 2
@@ -1582,16 +1669,16 @@ Resolvers MUST NOT auto-select a winner.
 
 **Scenario**: A later revision explicitly supersedes an earlier one.
 
-#### CATF Attestations
+#### CATF Attestations (Vector 3)
 
 * A1: Authorship (v1)
 * A2: Supersedes A1 (v2)
 
-#### Trust Policy
+#### Trust Policy (Vector 3)
 
 * Author trusted
 
-#### Expected CROF Summary
+#### Expected CROF Summary (Vector 3)
 
 * State: `Resolved`
 * Primary Path: A2 → A1
@@ -1603,14 +1690,14 @@ Resolvers MUST NOT auto-select a winner.
 
 **Scenario**: Buyer and Seller must both approve a contract.
 
-#### CATF Attestations
+#### CATF Attestations (Vector 4)
 
 * A1: Approval by Buyer
 * A2: Approval by Seller
 
-#### Trust Policy
+#### Trust Policy (Vector 4)
 
-```
+```text
 Require:
   Type: approval
   Role: buyer
@@ -1619,7 +1706,7 @@ Require:
   Role: seller
 ```
 
-#### Expected CROF Summary
+#### Expected CROF Summary (Vector 4)
 
 * State: `Resolved`
 * Confidence: High
@@ -1630,7 +1717,7 @@ Require:
 
 **Scenario**: Buyer approves, Seller does not.
 
-#### Expected CROF Summary
+#### Expected CROF Summary (Vector 5)
 
 * State: `Unresolved`
 * Reason: Insufficient trusted attestations
@@ -1641,12 +1728,12 @@ Require:
 
 **Scenario**: An approval is later revoked.
 
-#### CATF Attestations
+#### CATF Attestations (Vector 6)
 
 * A1: Approval by Buyer
 * A2: Revocation of A1 by Buyer
 
-#### Expected CROF Summary
+#### Expected CROF Summary (Vector 6)
 
 * State: `Revoked`
 * Active Paths: 0
