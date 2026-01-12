@@ -100,7 +100,7 @@ func mustAttestation(t *testing.T, subjectCID, description string, claims map[st
 	if err != nil {
 		t.Fatalf("parse pre: %v", err)
 	}
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.Signed, priv)
+	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), priv)
 	out, err := catf.Render(doc)
 	if err != nil {
 		t.Fatalf("render: %v", err)

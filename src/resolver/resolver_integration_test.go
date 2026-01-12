@@ -69,7 +69,11 @@ func TestVector3_ExplicitSupersession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse a1: %v", err)
 	}
-	a2Bytes := mustAttestation(t, subject, "Paper", map[string]string{"Supersedes": a1.CID(), "Type": "supersedes"}, issuerKey(pub), priv)
+	a1CID, err := a1.CID()
+	if err != nil {
+		t.Fatalf("a1 CID: %v", err)
+	}
+	a2Bytes := mustAttestation(t, subject, "Paper", map[string]string{"Supersedes": a1CID, "Type": "supersedes"}, issuerKey(pub), priv)
 
 	policy := trustPolicy(
 		[]trustEntry{{issuerKey(pub), "author"}},
@@ -156,8 +160,12 @@ func TestVector6_Revocation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse a1: %v", err)
 	}
+	a1CID, err := a1.CID()
+	if err != nil {
+		t.Fatalf("a1 CID: %v", err)
+	}
 	a2Bytes := mustAttestation(t, subject, "Contract", map[string]string{
-		"Target-Attestation": a1.CID(),
+		"Target-Attestation": a1CID,
 		"Type":               "revocation",
 	}, issuerKey(pub), priv)
 

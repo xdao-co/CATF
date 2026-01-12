@@ -14,5 +14,5 @@ func CanonicalizeCATF(input []byte) ([]byte, error) {
 		return nil, err
 	}
 	// Return a copy to prevent callers from mutating internal slices.
-	return append([]byte(nil), c.Raw...), nil
+	return append([]byte(nil), c.raw...), nil
 }

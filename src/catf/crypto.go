@@ -119,6 +119,18 @@ func digestFor(hashAlg string, message []byte) ([]byte, error) {
 // - Hash-Alg: sha512, sha3-256
 // - Signature-Alg: dilithium3 (post-quantum)
 func (c *CATF) Verify() error {
+	if c == nil {
+		return errors.New("nil CATF")
+	}
+	// Re-parse the receiver bytes to enforce canonicalization cannot be bypassed
+	// via a manually-constructed CATF or mutated fields.
+	parsed, err := Parse(c.raw)
+	if err != nil {
+		return err
+	}
+	// Use the parsed view for all cryptographic fields.
+	c = parsed
+
 	if c.SignatureAlg() == "" {
 		return errors.New("missing Signature-Alg")
 	}
@@ -146,7 +158,11 @@ func (c *CATF) Verify() error {
 	if err != nil {
 		return err
 	}
-	digest, err := digestFor(c.HashAlg(), c.Signed)
+	signedScope, err := signedScopeFromCanonical(c.raw)
+	if err != nil {
+		return err
+	}
+	digest, err := digestFor(c.HashAlg(), signedScope)
 	if err != nil {
 		return err
 	}

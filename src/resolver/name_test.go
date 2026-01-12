@@ -72,11 +72,15 @@ func TestResolveName_SupersededBindingChoosesHead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse b1: %v", err)
 	}
+	p1CID, err := p1.CID()
+	if err != nil {
+		t.Fatalf("b1 CID: %v", err)
+	}
 
 	b2 := mustAttestation(t, "bafy-name-record", "Name record", map[string]string{
 		"Name":       "contracts.realestate.123-main-st",
 		"Points-To":  "bafy-doc-2",
-		"Supersedes": p1.CID(),
+		"Supersedes": p1CID,
 		"Type":       "name-binding",
 		"Version":    "final",
 	}, issuerKey(pub), priv)

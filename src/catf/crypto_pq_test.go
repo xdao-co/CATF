@@ -44,7 +44,7 @@ func TestCATF_Verify_Dilithium3_SHA3_256(t *testing.T) {
 		t.Fatalf("Parse pre: %v", err)
 	}
 
-	sig, err := SignDilithium3(parsed.Signed, "sha3-256", sk)
+	sig, err := SignDilithium3(parsed.SignedBytes(), "sha3-256", sk)
 	if err != nil {
 		t.Fatalf("SignDilithium3: %v", err)
 	}

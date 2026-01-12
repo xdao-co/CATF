@@ -45,8 +45,14 @@ func TestResolve_SupersedesDisallowedByPolicyIsExcluded(t *testing.T) {
 	}
 
 	s2Bytes := mustAttestation(t, subject, "Paper", map[string]string{
-		"Supersedes": a1.CID(),
-		"Type":       "supersedes",
+		"Supersedes": func() string {
+			cid, cidErr := a1.CID()
+			if cidErr != nil {
+				t.Fatalf("a1 CID: %v", cidErr)
+			}
+			return cid
+		}(),
+		"Type": "supersedes",
 	}, issuerKey(pub), priv)
 
 	// Policy trusts the issuer as "author" but only allows supersession by "buyer".
@@ -98,5 +104,9 @@ func catfMustCID(t *testing.T, attBytes []byte) string {
 	if err != nil {
 		t.Fatalf("parse attestation: %v", err)
 	}
-	return a.CID()
+	cid, err := a.CID()
+	if err != nil {
+		t.Fatalf("CID: %v", err)
+	}
+	return cid
 }

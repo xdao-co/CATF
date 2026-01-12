@@ -47,7 +47,7 @@ func validCATFBytes(t *testing.T) []byte {
 		t.Fatalf("parse pre: %v", err)
 	}
 
-	doc.Crypto["Signature"] = SignEd25519SHA256(parsed.Signed, priv)
+	doc.Crypto["Signature"] = SignEd25519SHA256(parsed.SignedBytes(), priv)
 	out, err := Render(doc)
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -70,7 +70,7 @@ func TestParseValidCATF(t *testing.T) {
 	if catf.Sections["CLAIMS"].Pairs["Type"] != "authorship" {
 		t.Errorf("expected Type=authorship, got %v", catf.Sections["CLAIMS"].Pairs["Type"])
 	}
-	if len(catf.Signed) == 0 {
+	if len(catf.SignedBytes()) == 0 {
 		t.Fatalf("expected non-empty signed bytes")
 	}
 }
@@ -114,6 +114,54 @@ Signature: SIG_A1
 	_, err := Parse([]byte(bad))
 	if err == nil {
 		t.Fatal("expected error for unsorted keys")
+	}
+}
+
+func TestCATF_Verify_RejectsMutatedSignedScope(t *testing.T) {
+	attBytes := validCATFBytes(t)
+	a, err := Parse(attBytes)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if err := a.Verify(); err != nil {
+		t.Fatalf("Verify (baseline): %v", err)
+	}
+
+	// Attempt to bypass signature scope by mutating the Signed bytes on the parsed object.
+	// Verify must be derived from canonical bytes, not caller-controlled fields.
+	signed := a.SignedBytes()
+	if len(signed) == 0 {
+		t.Fatalf("expected non-empty signed scope")
+	}
+	signed[0] ^= 0x01
+	// Mutating the caller's copy must not impact the parsed attestation.
+	if err := a.Verify(); err != nil {
+		t.Fatalf("Verify should remain stable after mutating SignedBytes() copy: %v", err)
+	}
+}
+
+func TestCATF_CID_RejectsMutatedRawBytes(t *testing.T) {
+	attBytes := validCATFBytes(t)
+	a, err := Parse(attBytes)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if _, err := a.CID(); err != nil {
+		t.Fatalf("CID (baseline): %v", err)
+	}
+
+	// Attempt to bypass canonicalization by mutating Raw bytes after Parse.
+	raw := a.CanonicalBytes()
+	if len(raw) == 0 {
+		t.Fatalf("expected non-empty raw bytes")
+	}
+	raw[0] ^= 0x01
+	// Mutating the caller's copy must not impact the parsed attestation.
+	if _, err := a.CID(); err != nil {
+		t.Fatalf("CID should remain stable after mutating CanonicalBytes() copy: %v", err)
+	}
+	if err := a.Verify(); err != nil {
+		t.Fatalf("Verify should remain stable after mutating CanonicalBytes() copy: %v", err)
 	}
 }
 

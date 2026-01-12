@@ -54,7 +54,14 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
 			continue
 		}
-		cid := a.CID()
+		cid, err := a.CID()
+		if err != nil {
+			v.CID = cidutil.CIDv1RawSHA256(b)
+			v.ExcludedReason = "CATF parse/canonicalization failed"
+			verdicts = append(verdicts, v)
+			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
+			continue
+		}
 		v.CID = cid
 		v.IssuerKey = a.IssuerKey()
 		v.ClaimType = a.ClaimType()

@@ -462,7 +462,7 @@ func cmdAttest(args []string, out io.Writer, errOut io.Writer) int {
 		return 1
 	}
 
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.Signed, priv)
+	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), priv)
 	finalBytes, err := catf.Render(doc)
 	if err != nil {
 		fmt.Fprintf(errOut, "render final: %v\n", err)
@@ -482,7 +482,12 @@ func cmdAttest(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
-	fmt.Fprintf(errOut, "Attestation-CID: %s\n", finalAtt.CID())
+	attCID, err := finalAtt.CID()
+	if err != nil {
+		fmt.Fprintf(errOut, "cid: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(errOut, "Attestation-CID: %s\n", attCID)
 	_, _ = out.Write(finalBytes)
 	return 0
 }
@@ -785,7 +790,12 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 			fmt.Fprintf(errOut, "invalid CATF attestation %s: %v\n", p, perr)
 			return 2
 		}
-		attCIDs = append(attCIDs, a.CID())
+		cid, err := a.CID()
+		if err != nil {
+			fmt.Fprintf(errOut, "cid for %s: %v\n", p, err)
+			return 1
+		}
+		attCIDs = append(attCIDs, cid)
 	}
 
 	res, err := resolver.ResolveWithOptions(attBytes, policyBytes, subjectCID, opts)
@@ -884,7 +894,12 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 			fmt.Fprintf(errOut, "invalid CATF attestation %s: %v\n", p, perr)
 			return 2
 		}
-		attCIDs = append(attCIDs, a.CID())
+		cid, err := a.CID()
+		if err != nil {
+			fmt.Fprintf(errOut, "cid for %s: %v\n", p, err)
+			return 1
+		}
+		attCIDs = append(attCIDs, cid)
 	}
 
 	nameRes, err := resolver.ResolveNameWithOptions(attBytes, policyBytes, name, version, opts)

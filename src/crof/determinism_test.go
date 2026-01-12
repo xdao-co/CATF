@@ -45,7 +45,7 @@ func mustAttestation(t *testing.T, subjectCID, description string, claims map[st
 	if err != nil {
 		t.Fatalf("Parse pre: %v", err)
 	}
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.Signed, priv)
+	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), priv)
 	out, err := catf.Render(doc)
 	if err != nil {
 		t.Fatalf("Render final: %v", err)
@@ -119,7 +119,11 @@ func TestDeterminism_CROF_ByteIdentical_ShuffledInputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Parse for CID: %v", err)
 		}
-		cids = append(cids, p.CID())
+		cid, err := p.CID()
+		if err != nil {
+			t.Fatalf("CID: %v", err)
+		}
+		cids = append(cids, cid)
 	}
 
 	perms := permuteIndices(len(inputs))
