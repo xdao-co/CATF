@@ -32,6 +32,8 @@ else
 fi
 echo "Key subject CID: $KEY_SUBJECT_CID" >&2
 
+EFFECTIVE_DATE="2026-01-01T00:00:00Z"
+
 # Attest provenance (root key) and authorization (signing key).
 ("$XDAO_CATF_BIN" attest \
   --subject "$KEY_SUBJECT_CID" \
@@ -49,6 +51,7 @@ echo "Key subject CID: $KEY_SUBJECT_CID" >&2
   --signer-role signing \
   --type approval \
   --role signing \
+  --effective-date "$EFFECTIVE_DATE" \
   --claim "Comment=Authorized for document signing" \
   > /tmp/xdao-key-authorization.catf) 2> /tmp/xdao-key-authorization.meta
 

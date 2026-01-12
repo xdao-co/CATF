@@ -33,6 +33,8 @@ else
 fi
 echo "Subject CID: $SUBJECT_CID" >&2
 
+EFFECTIVE_DATE="2026-01-01T00:00:00Z"
+
 ("$XDAO_CATF_BIN" attest \
   --subject "$SUBJECT_CID" \
   --description "Scientific paper" \
@@ -49,6 +51,7 @@ echo "Subject CID: $SUBJECT_CID" >&2
   --signer-role ai-reviewer \
   --type approval \
   --role ai-reviewer \
+  --effective-date "$EFFECTIVE_DATE" \
   --claim "Comment=Methodology sound; reproducible" \
   > /tmp/xdao-sci-ai-a.catf) 2> /tmp/xdao-sci-ai-a.meta
 
@@ -59,6 +62,7 @@ echo "Subject CID: $SUBJECT_CID" >&2
   --signer-role ai-reviewer \
   --type approval \
   --role ai-reviewer \
+  --effective-date "$EFFECTIVE_DATE" \
   --claim "Comment=Statistical analysis valid" \
   > /tmp/xdao-sci-ai-b.catf) 2> /tmp/xdao-sci-ai-b.meta
 

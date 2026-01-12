@@ -30,6 +30,8 @@ else
 fi
 echo "Subject CID: $SUBJECT_CID" >&2
 
+EFFECTIVE_DATE="2026-01-01T00:00:00Z"
+
 # Author authorship attestation
 ("$XDAO_CATF_BIN" attest \
   --subject "$SUBJECT_CID" \
@@ -51,6 +53,7 @@ echo "A1 CID: $a1_cid" >&2
   --signer-role reviewer \
   --type approval \
   --role reviewer \
+  --effective-date "$EFFECTIVE_DATE" \
   --claim "Comment=Reviewed and approved" \
   > /tmp/xdao-r1.catf) 2> /tmp/xdao-r1.meta
 

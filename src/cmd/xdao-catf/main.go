@@ -369,7 +369,8 @@ func cmdAttest(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 	if claims["Type"] == "approval" && claims["Effective-Date"] == "" {
-		claims["Effective-Date"] = time.Now().UTC().Format(time.RFC3339)
+		fmt.Fprintln(errOut, "missing required claim: Effective-Date for Type=approval (provide --effective-date or --claim Effective-Date=...)")
+		return 2
 	}
 
 	doc := catf.Document{
@@ -700,11 +701,13 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 	var policyPath string
 	var attPaths stringList
 	var resolverID string
+	var resolvedAt string
 
 	fs.StringVar(&subjectCID, "subject", "", "Subject CID")
 	fs.StringVar(&policyPath, "policy", "", "TPDL policy file")
 	fs.Var(&attPaths, "att", "CATF attestation file (repeatable)")
 	fs.StringVar(&resolverID, "resolver-id", "xdao-resolver-reference", "Resolver-ID recorded in CROF")
+	fs.StringVar(&resolvedAt, "resolved-at", "", "Optional RFC3339 timestamp for CROF META Resolved-At (omit for deterministic output)")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -722,6 +725,16 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
+	var resolvedAtTime time.Time
+	if resolvedAt != "" {
+		t, perr := time.Parse(time.RFC3339, resolvedAt)
+		if perr != nil {
+			fmt.Fprintf(errOut, "invalid --resolved-at (expected RFC3339): %v\n", perr)
+			return 2
+		}
+		resolvedAtTime = t
+	}
+
 	policyBytes, err := os.ReadFile(policyPath)
 	if err != nil {
 		fmt.Fprintf(errOut, "read policy: %v\n", err)
@@ -737,9 +750,12 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 			return 1
 		}
 		attBytes = append(attBytes, b)
-		if a, perr := catf.Parse(b); perr == nil {
-			attCIDs = append(attCIDs, a.CID())
+		a, perr := catf.Parse(b)
+		if perr != nil {
+			fmt.Fprintf(errOut, "invalid CATF attestation %s: %v\n", p, perr)
+			return 2
 		}
+		attCIDs = append(attCIDs, a.CID())
 	}
 
 	res, err := resolver.Resolve(attBytes, policyBytes, subjectCID)
@@ -752,7 +768,7 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 		res,
 		crof.PolicyCID(policyBytes),
 		attCIDs,
-		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: time.Now()},
+		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime},
 	)
 
 	_, _ = out.Write(crofBytes)
@@ -768,12 +784,14 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 	var policyPath string
 	var attPaths stringList
 	var resolverID string
+	var resolvedAt string
 
 	fs.StringVar(&name, "name", "", "Symbolic name")
 	fs.StringVar(&version, "version", "", "Optional version")
 	fs.StringVar(&policyPath, "policy", "", "TPDL policy file")
 	fs.Var(&attPaths, "att", "CATF attestation file (repeatable)")
 	fs.StringVar(&resolverID, "resolver-id", "xdao-resolver-reference", "Resolver-ID recorded in CROF")
+	fs.StringVar(&resolvedAt, "resolved-at", "", "Optional RFC3339 timestamp for CROF META Resolved-At (omit for deterministic output)")
 
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -791,6 +809,16 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
+	var resolvedAtTime time.Time
+	if resolvedAt != "" {
+		t, perr := time.Parse(time.RFC3339, resolvedAt)
+		if perr != nil {
+			fmt.Fprintf(errOut, "invalid --resolved-at (expected RFC3339): %v\n", perr)
+			return 2
+		}
+		resolvedAtTime = t
+	}
+
 	policyBytes, err := os.ReadFile(policyPath)
 	if err != nil {
 		fmt.Fprintf(errOut, "read policy: %v\n", err)
@@ -806,9 +834,12 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 			return 1
 		}
 		attBytes = append(attBytes, b)
-		if a, perr := catf.Parse(b); perr == nil {
-			attCIDs = append(attCIDs, a.CID())
+		a, perr := catf.Parse(b)
+		if perr != nil {
+			fmt.Fprintf(errOut, "invalid CATF attestation %s: %v\n", p, perr)
+			return 2
 		}
+		attCIDs = append(attCIDs, a.CID())
 	}
 
 	nameRes, err := resolver.ResolveName(attBytes, policyBytes, name, version)
@@ -838,7 +869,7 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 		res,
 		crof.PolicyCID(policyBytes),
 		attCIDs,
-		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: time.Now()},
+		crof.RenderOptions{ResolverID: resolverID, ResolvedAt: resolvedAtTime},
 	)
 	_, _ = out.Write(crofBytes)
 	return 0

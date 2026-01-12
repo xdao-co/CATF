@@ -285,7 +285,7 @@ crofBytes := crof.Render(
   res,
   crof.PolicyCID(policyBytes),
   attestationCIDs,
-  crof.RenderOptions{ResolverID: "your-resolver", ResolvedAt: time.Now()},
+  crof.RenderOptions{ResolverID: "your-resolver"},
 )
 ```
 

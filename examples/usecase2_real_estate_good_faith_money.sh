@@ -21,6 +21,8 @@ else
 fi
 echo "Subject CID: $SUBJECT_CID" >&2
 
+EFFECTIVE_DATE="2026-01-01T00:00:00Z"
+
 # Create local keys (random) and role keys matching the policy roles.
 "$XDAO_CATF_BIN" key init --name buyer >/dev/null
 "$XDAO_CATF_BIN" key init --name seller >/dev/null
@@ -42,6 +44,7 @@ ESCROW_KEY="$("$XDAO_CATF_BIN" key export --name escrow --role escrow-agent)"
   --signer-role buyer \
   --type approval \
   --role buyer \
+  --effective-date "$EFFECTIVE_DATE" \
   --claim 'Good-Faith-Money=$10,000 deposited' \
   > /tmp/xdao-rea-buyer.catf) 2> /tmp/xdao-rea-buyer.meta
 
@@ -56,6 +59,7 @@ echo "Buyer approval CID: $B1_CID" >&2
   --signer-role seller \
   --type approval \
   --role seller \
+  --effective-date "$EFFECTIVE_DATE" \
   > /tmp/xdao-rea-seller.catf) 2> /tmp/xdao-rea-seller.meta
 
 S1_CID="$(grep '^Attestation-CID: ' /tmp/xdao-rea-seller.meta | sed 's/^Attestation-CID: //')"
@@ -69,6 +73,7 @@ echo "Seller approval CID: $S1_CID" >&2
   --signer-role escrow-agent \
   --type approval \
   --role escrow-agent \
+  --effective-date "$EFFECTIVE_DATE" \
   --claim "Funds=Held in escrow account #XYZ" \
   > /tmp/xdao-rea-escrow.catf) 2> /tmp/xdao-rea-escrow.meta
 

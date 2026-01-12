@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"xdao.co/catf/catf"
+	"xdao.co/catf/cidutil"
 	"xdao.co/catf/tpdl"
 )
 
@@ -76,7 +77,7 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 	for _, b := range attestationBytes {
 		a, perr := catf.Parse(b)
 		if perr != nil {
-			exclusions = append(exclusions, Exclusion{Reason: "CATF parse/canonicalization failed"})
+			exclusions = append(exclusions, Exclusion{CID: cidutil.CIDv1RawSHA256(b), Reason: "CATF parse/canonicalization failed"})
 			continue
 		}
 		cid := a.CID()

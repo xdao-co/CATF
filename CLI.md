@@ -154,7 +154,7 @@ Sign with an explicit seed (demo-only fallback):
 
 Notes:
 
-- `Type=approval` requires `Effective-Date`; if omitted, the CLI fills it with `time.Now().UTC()` in RFC3339.
+- `Type=approval` requires `Effective-Date`; the CLI does not fill it implicitly (provide `--effective-date` or `--claim Effective-Date=...`).
 - `Type=revocation` targets a prior attestation CID via `--target-attestation <AttestationCID>`.
 - `Type=supersedes` links to a prior attestation CID via `--supersedes <AttestationCID>`.
 - The CLI currently sets `Signature-Alg: ed25519` and `Hash-Alg: sha256`.

@@ -1,13 +1,22 @@
 package catf
 
 import (
-	"crypto/rand"
 	"encoding/base64"
+	"io"
 	"testing"
 )
 
+type deterministicReader struct{}
+
+func (deterministicReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0x42
+	}
+	return len(p), nil
+}
+
 func TestCATF_Verify_Dilithium3_SHA3_256(t *testing.T) {
-	pk, sk, err := GenerateDilithium3Keypair(rand.Reader)
+	pk, sk, err := GenerateDilithium3Keypair(io.Reader(deterministicReader{}))
 	if err != nil {
 		t.Fatalf("GenerateDilithium3Keypair: %v", err)
 	}

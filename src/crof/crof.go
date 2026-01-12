@@ -2,7 +2,6 @@
 package crof
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
@@ -23,7 +22,7 @@ const (
 // PolicyCID returns a deterministic local identifier for a trust policy document.
 // This is an IPFS-compatible CIDv1 (raw + sha2-256) derived from canonical bytes.
 func PolicyCID(policyBytes []byte) string {
-	return cidutil.CIDv1RawSHA256(bytes.TrimSpace(policyBytes))
+	return cidutil.CIDv1RawSHA256(policyBytes)
 }
 
 type RenderOptions struct {
