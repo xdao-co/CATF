@@ -64,3 +64,27 @@ func TestParseInvalidTPDL_MissingPreamble(t *testing.T) {
 		t.Error("expected error for missing preamble")
 	}
 }
+
+func TestParseTPDL_SupersedesAllowedBy(t *testing.T) {
+	policyText := `-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+Spec: xdao-tpdl-1
+
+TRUST
+Key: ed25519:K1
+Role: buyer
+
+RULES
+Supersedes:
+  Allowed-By: buyer, seller
+-----END XDAO TRUST POLICY-----`
+
+	policy, err := Parse([]byte(policyText))
+	if err != nil {
+		t.Fatalf("expected valid TPDL, got error: %v", err)
+	}
+	if len(policy.SupersedesAllowedBy) != 2 {
+		t.Fatalf("expected 2 allowed-by roles, got %+v", policy.SupersedesAllowedBy)
+	}
+}

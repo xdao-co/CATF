@@ -52,11 +52,11 @@ type Exclusion struct {
 }
 
 type attestation struct {
-	catf      *catf.CATF
-	cid       string
-	trusted   bool
-	trustRole string
-	revoked   bool
+	catf       *catf.CATF
+	cid        string
+	trusted    bool
+	trustRoles map[string]bool
+	revoked    bool
 }
 
 // Resolve parses inputs and produces a deterministic resolution for a single subject CID.
@@ -89,9 +89,24 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 			continue
 		}
 		att := &attestation{catf: a, cid: cid}
-		if role, ok := trustIndex[a.IssuerKey()]; ok {
+		if roles, ok := trustIndex[a.IssuerKey()]; ok {
 			att.trusted = true
-			att.trustRole = role
+			att.trustRoles = roles
+		} else {
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Issuer not trusted"})
+		}
+		if att.trusted && a.ClaimType() == "supersedes" && len(policy.SupersedesAllowedBy) > 0 {
+			allowed := false
+			for _, role := range policy.SupersedesAllowedBy {
+				if att.trustRoles[role] {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				att.trusted = false
+				exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Supersedes not allowed by policy"})
+			}
 		}
 		atts = append(atts, att)
 	}
@@ -165,16 +180,15 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 	return res, nil
 }
 
-func indexTrust(policy *tpdl.Policy) map[string]string {
-	idx := make(map[string]string)
+func indexTrust(policy *tpdl.Policy) map[string]map[string]bool {
+	idx := make(map[string]map[string]bool)
 	for _, t := range policy.Trust {
-		if existing, ok := idx[t.Key]; ok {
-			if t.Role < existing {
-				idx[t.Key] = t.Role
-			}
-			continue
+		m := idx[t.Key]
+		if m == nil {
+			m = make(map[string]bool)
+			idx[t.Key] = m
 		}
-		idx[t.Key] = t.Role
+		m[t.Role] = true
 	}
 	return idx
 }
@@ -208,13 +222,15 @@ func rulesSatisfied(policy *tpdl.Policy, activeTrusted []*attestation) bool {
 	typeRoleToKeys := make(map[string]map[string]bool)
 	for _, a := range activeTrusted {
 		issuer := a.catf.IssuerKey()
-		key := a.catf.ClaimType() + "|" + a.trustRole
-		m := typeRoleToKeys[key]
-		if m == nil {
-			m = make(map[string]bool)
-			typeRoleToKeys[key] = m
+		for role := range a.trustRoles {
+			key := a.catf.ClaimType() + "|" + role
+			m := typeRoleToKeys[key]
+			if m == nil {
+				m = make(map[string]bool)
+				typeRoleToKeys[key] = m
+			}
+			m[issuer] = true
 		}
-		m[issuer] = true
 	}
 	for _, r := range policy.Rules {
 		q := r.Quorum

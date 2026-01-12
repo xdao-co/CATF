@@ -56,9 +56,11 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 			continue
 		}
 		att := &attestation{catf: a, cid: cid}
-		if role, ok := trustIndex[a.IssuerKey()]; ok {
+		if roles, ok := trustIndex[a.IssuerKey()]; ok {
 			att.trusted = true
-			att.trustRole = role
+			att.trustRoles = roles
+		} else {
+			exclusions = append(exclusions, Exclusion{CID: cid, Reason: "Issuer not trusted"})
 		}
 		atts = append(atts, att)
 	}

@@ -2,9 +2,9 @@
 package tpdl
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -13,6 +13,10 @@ type Policy struct {
 	Meta  map[string]string
 	Trust []TrustEntry
 	Rules []Rule
+
+	// SupersedesAllowedBy restricts which trusted roles may issue supersession attestations.
+	// When empty, supersession attestations are not additionally restricted by policy.
+	SupersedesAllowedBy []string
 }
 
 type TrustEntry struct {
@@ -40,74 +44,172 @@ func Parse(data []byte) (*Policy, error) {
 		}
 	}
 
-	if !bytes.HasPrefix(data, []byte("-----BEGIN XDAO TRUST POLICY-----")) {
+	lines := strings.Split(string(data), "\n")
+	// Allow a trailing newline in the input by dropping the last empty line.
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) < 2 {
+		return nil, errors.New("TPDL too short")
+	}
+	if lines[0] != "-----BEGIN XDAO TRUST POLICY-----" {
 		return nil, errors.New("missing TPDL preamble")
 	}
-	if !bytes.HasSuffix(bytes.TrimSpace(data), []byte("-----END XDAO TRUST POLICY-----")) {
+	if lines[len(lines)-1] != "-----END XDAO TRUST POLICY-----" {
 		return nil, errors.New("missing TPDL postamble")
 	}
-	sections := map[string]bool{"META": true, "TRUST": true, "RULES": true}
-	reader := bufio.NewReader(bytes.NewReader(data))
-	var currSection string
+
 	meta := make(map[string]string)
 	var trust []TrustEntry
 	var rules []Rule
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil && err.Error() != "EOF" {
-			return nil, err
-		}
-		line = strings.TrimSpace(line)
-		if sections[line] {
-			currSection = line
+	allowedBy := make(map[string]bool)
+
+	stripIndent := func(s string) string {
+		return strings.TrimLeft(s, " \t")
+	}
+
+	sectionOrder := []string{"META", "TRUST", "RULES"}
+	sectionIndex := -1
+	currSection := ""
+
+	for i := 1; i < len(lines)-1; {
+		line := lines[i]
+		if line == "" {
+			i++
 			continue
 		}
-		if currSection == "META" && strings.Contains(line, ": ") {
+
+		// Section headers must appear in fixed order.
+		if line == "META" || line == "TRUST" || line == "RULES" {
+			if currSection != "" {
+				// ok
+			}
+			sectionIndex++
+			if sectionIndex >= len(sectionOrder) || sectionOrder[sectionIndex] != line {
+				return nil, errors.New("sections missing or out of order")
+			}
+			currSection = line
+			i++
+			continue
+		}
+		if currSection == "" {
+			return nil, errors.New("unexpected content before first section")
+		}
+
+		switch currSection {
+		case "META":
+			if !strings.Contains(line, ": ") {
+				return nil, errors.New("invalid META key-value")
+			}
 			kv := strings.SplitN(line, ": ", 2)
 			meta[kv[0]] = kv[1]
-		}
-		if currSection == "TRUST" && strings.HasPrefix(line, "Key: ") {
+			i++
+		case "TRUST":
+			if !strings.HasPrefix(line, "Key: ") {
+				return nil, errors.New("expected Key in TRUST")
+			}
 			key := strings.TrimPrefix(line, "Key: ")
-			roleLine, _ := reader.ReadString('\n')
-			roleLine = strings.TrimSpace(roleLine)
+			if key == "" {
+				return nil, errors.New("empty Key")
+			}
+			if i+1 >= len(lines)-1 {
+				return nil, errors.New("expected Role after Key")
+			}
+			roleLine := lines[i+1]
 			if !strings.HasPrefix(roleLine, "Role: ") {
 				return nil, errors.New("expected Role after Key")
 			}
 			role := strings.TrimPrefix(roleLine, "Role: ")
+			if role == "" {
+				return nil, errors.New("empty Role")
+			}
 			trust = append(trust, TrustEntry{Key: key, Role: role})
-		}
-		if currSection == "RULES" && strings.HasPrefix(line, "Require:") {
-			var r Rule
-			r.Quorum = 1
-			for {
-				l, _ := reader.ReadString('\n')
-				l = strings.TrimSpace(l)
-				if l == "" || strings.HasSuffix(l, ":") || l == "-----END XDAO TRUST POLICY-----" {
-					break
-				}
-				if strings.HasPrefix(l, "Type: ") {
-					r.Type = strings.TrimPrefix(l, "Type: ")
-				}
-				if strings.HasPrefix(l, "Role: ") {
-					r.Role = strings.TrimPrefix(l, "Role: ")
-				}
-				if strings.HasPrefix(l, "Quorum: ") {
-					qStr := strings.TrimPrefix(l, "Quorum: ")
-					q, qErr := strconv.Atoi(qStr)
-					if qErr != nil || q < 1 {
-						return nil, errors.New("invalid Quorum")
+			i += 2
+		case "RULES":
+			if line == "Require:" {
+				var r Rule
+				r.Quorum = 1
+				i++
+				for i < len(lines)-1 {
+					l := lines[i]
+					if l == "" {
+						i++
+						break
 					}
-					r.Quorum = q
+					// New block or section header.
+					if l == "Require:" || l == "Supersedes:" || l == "META" || l == "TRUST" || l == "RULES" {
+						break
+					}
+					l = stripIndent(l)
+					switch {
+					case strings.HasPrefix(l, "Type: "):
+						r.Type = strings.TrimPrefix(l, "Type: ")
+					case strings.HasPrefix(l, "Role: "):
+						r.Role = strings.TrimPrefix(l, "Role: ")
+					case strings.HasPrefix(l, "Quorum: "):
+						qStr := strings.TrimPrefix(l, "Quorum: ")
+						q, qErr := strconv.Atoi(qStr)
+						if qErr != nil || q < 1 {
+							return nil, errors.New("invalid Quorum")
+						}
+						r.Quorum = q
+					default:
+						return nil, errors.New("unknown field in Require block")
+					}
+					i++
 				}
+				if r.Type == "" || r.Role == "" {
+					return nil, errors.New("Require block missing Type or Role")
+				}
+				rules = append(rules, r)
+				continue
 			}
-			if r.Type == "" || r.Role == "" {
-				return nil, errors.New("Require block missing Type or Role")
+			if line == "Supersedes:" {
+				i++
+				for i < len(lines)-1 {
+					l := lines[i]
+					if l == "" {
+						i++
+						break
+					}
+					if l == "Require:" || l == "Supersedes:" || l == "META" || l == "TRUST" || l == "RULES" {
+						break
+					}
+					l = stripIndent(l)
+					if strings.HasPrefix(l, "Allowed-By: ") {
+						list := strings.TrimPrefix(l, "Allowed-By: ")
+						for _, part := range strings.Split(list, ",") {
+							role := strings.TrimSpace(part)
+							if role == "" {
+								continue
+							}
+							allowedBy[role] = true
+						}
+						if len(list) == 0 {
+							return nil, errors.New("Allowed-By must not be empty")
+						}
+					} else {
+						return nil, errors.New("unknown field in Supersedes block")
+					}
+					i++
+				}
+				continue
 			}
-			rules = append(rules, r)
-		}
-		if err != nil {
-			break
+			return nil, errors.New("unexpected content in RULES")
+		default:
+			return nil, errors.New("unknown section")
 		}
 	}
-	return &Policy{Meta: meta, Trust: trust, Rules: rules}, nil
+
+	if sectionIndex != len(sectionOrder)-1 {
+		return nil, errors.New("sections missing or out of order")
+	}
+
+	allowedList := make([]string, 0, len(allowedBy))
+	for r := range allowedBy {
+		allowedList = append(allowedList, r)
+	}
+	sort.Strings(allowedList)
+
+	return &Policy{Meta: meta, Trust: trust, Rules: rules, SupersedesAllowedBy: allowedList}, nil
 }
