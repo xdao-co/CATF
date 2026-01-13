@@ -1,0 +1,34 @@
+-----BEGIN XDAO RESOLUTION-----
+META
+Resolver-ID: xdao-resolver-reference
+Spec: xdao-crof-1
+Version: 1
+
+INPUTS
+Trust-Policy-CID: bafkreibaud53a2vwdgs4ulhzarb4amdyjjjj3gxqax322s54peliq2oqtu
+Attestation-CID: bafkreigztghh3u3qaewnmugi4pb5egczxnc7wemuktsmdyzut7muexfamm
+
+RESULT
+Confidence: High
+State: Resolved
+Subject-CID: bafy-doc-1
+
+PATHS
+Path-ID: path-1
+Attestation-CID: bafkreigztghh3u3qaewnmugi4pb5egczxnc7wemuktsmdyzut7muexfamm
+
+FORKS
+
+EXCLUSIONS
+
+VERDICTS
+Attestation-CID: bafkreigztghh3u3qaewnmugi4pb5egczxnc7wemuktsmdyzut7muexfamm
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Claim-Type: authorship
+Trusted: true
+Revoked: false
+Trust-Role: author
+
+CRYPTO
+
+-----END XDAO RESOLUTION-----

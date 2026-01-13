@@ -1,0 +1,50 @@
+-----BEGIN XDAO RESOLUTION-----
+META
+Resolver-ID: xdao-resolver-reference
+Spec: xdao-crof-1
+Version: 1
+
+INPUTS
+Trust-Policy-CID: bafkreifuspsbcjtzu676reoiykxgpvzhznw7pgcxnhmxyerhlrkdxlbr5e
+Attestation-CID: bafkreiagoe3m4ofrbdy2n6kk4xb3cfme55ifrn4hezzvgxsuwwwxqfyvkq
+Attestation-CID: bafkreiggp3ovew57em2xfzapfkcod5ka73tywpqtkl5vadsclwelugshky
+Attestation-CID: bafkreiguzs2yhgkpcxgyzvtquiiktcfpgslhlmxlbmhnj5tmftrqfzvcxq
+
+RESULT
+Confidence: High
+State: Resolved
+Subject-CID: bafy-doc-supersedes-1
+
+PATHS
+Path-ID: path-1
+Attestation-CID: bafkreiagoe3m4ofrbdy2n6kk4xb3cfme55ifrn4hezzvgxsuwwwxqfyvkq
+Attestation-CID: bafkreiguzs2yhgkpcxgyzvtquiiktcfpgslhlmxlbmhnj5tmftrqfzvcxq
+Attestation-CID: bafkreiggp3ovew57em2xfzapfkcod5ka73tywpqtkl5vadsclwelugshky
+
+FORKS
+
+EXCLUSIONS
+
+VERDICTS
+Attestation-CID: bafkreiagoe3m4ofrbdy2n6kk4xb3cfme55ifrn4hezzvgxsuwwwxqfyvkq
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Claim-Type: supersedes
+Trusted: true
+Revoked: false
+Trust-Role: author
+Attestation-CID: bafkreiggp3ovew57em2xfzapfkcod5ka73tywpqtkl5vadsclwelugshky
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Claim-Type: authorship
+Trusted: true
+Revoked: false
+Trust-Role: author
+Attestation-CID: bafkreiguzs2yhgkpcxgyzvtquiiktcfpgslhlmxlbmhnj5tmftrqfzvcxq
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Claim-Type: supersedes
+Trusted: true
+Revoked: false
+Trust-Role: author
+
+CRYPTO
+
+-----END XDAO RESOLUTION-----

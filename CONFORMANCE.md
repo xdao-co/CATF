@@ -12,6 +12,7 @@ Constraints:
 - Structural contract (normative): [spec/CATF-STRUCT-1.md](spec/CATF-STRUCT-1.md)
 - Error taxonomy & rule catalog (normative): [spec/CATF-ERRORS-1.md](spec/CATF-ERRORS-1.md)
 - CATF vectors: `src/testdata/conformance/catf/`
+- Resolver vectors: `src/testdata/conformance/resolver/`
 
 ## What Vectors Assert
 
@@ -22,6 +23,8 @@ Vectors may assert one or more of:
 - Hash equivalence (CID)
 - Signature verification expectations
 - Resolver determinism (given explicit inputs)
+
+Resolver vectors MUST include all resolver inputs (attestation bytes, trust policy bytes, subject CID, resolver ID/options) and publish the expected CROF bytes + CID.
 
 ## Running in Go
 

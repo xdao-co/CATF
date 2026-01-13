@@ -164,7 +164,7 @@ func TestVerdicts_AreCompleteAndSurfaced_DeterministicUnderShuffle(t *testing.T)
 
 	m1CID := mustCATFCID(t, m1)
 	expected[m1CID] = func(v resolver.Verdict) bool {
-		return v.ExcludedReason == "missing required claim: Effective-Date"
+		return v.ExcludedReason == "CATF-VAL-212"
 	}
 
 	badSigCID := cidutil.CIDv1RawSHA256(badSig)

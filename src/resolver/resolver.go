@@ -2,6 +2,7 @@
 package resolver
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
@@ -116,7 +117,7 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 		v.IssuerKey = a.IssuerKey()
 		v.ClaimType = a.ClaimType()
 		if err := catf.ValidateCoreClaims(a); err != nil {
-			v.ExcludedReason = err.Error()
+			v.ExcludedReason = stableCATFReason(err)
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
@@ -257,6 +258,19 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 	res.State = StateResolved
 	res.Confidence = ConfidenceHigh
 	return res, nil
+}
+
+func stableCATFReason(err error) string {
+	if err == nil {
+		return ""
+	}
+	var e *catf.Error
+	if errors.As(err, &e) {
+		if e.RuleID != "" {
+			return e.RuleID
+		}
+	}
+	return err.Error()
 }
 
 func indexTrust(policy *tpdl.Policy) map[string]map[string]bool {

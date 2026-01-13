@@ -67,7 +67,7 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 		v.IssuerKey = a.IssuerKey()
 		v.ClaimType = a.ClaimType()
 		if err := catf.ValidateCoreClaims(a); err != nil {
-			v.ExcludedReason = err.Error()
+			v.ExcludedReason = stableCATFReason(err)
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue

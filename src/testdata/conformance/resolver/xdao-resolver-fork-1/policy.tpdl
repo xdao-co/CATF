@@ -1,0 +1,17 @@
+-----BEGIN XDAO TRUST POLICY-----
+META
+Spec: xdao-tpdl-1
+Version: 1
+
+TRUST
+Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Role: author
+
+Key: ed25519:VRVPQgZepaG+oFRjgmviaE65LfksEAAnqrquV8pVQgc=
+Role: author
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+-----END XDAO TRUST POLICY-----
