@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"xdao.co/catf/catf"
-	"xdao.co/catf/cidutil"
 	"xdao.co/catf/tpdl"
 )
 
@@ -49,7 +48,7 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 		v := Verdict{}
 		a, perr := catf.Parse(b)
 		if perr != nil {
-			v.CID = cidutil.CIDv1RawSHA256(b)
+			v.CID = ""
 			v.ExcludedReason = "CATF parse/canonicalization failed"
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
@@ -57,7 +56,7 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 		}
 		cid, err := a.CID()
 		if err != nil {
-			v.CID = cidutil.CIDv1RawSHA256(b)
+			v.CID = ""
 			v.ExcludedReason = "CATF parse/canonicalization failed"
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
@@ -106,7 +105,7 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 			verdicts[idx].Revoked = true
 		}
 	}
-	sort.Slice(verdicts, func(i, j int) bool {
+	sort.SliceStable(verdicts, func(i, j int) bool {
 		if verdicts[i].CID == verdicts[j].CID {
 			if verdicts[i].ExcludedReason == verdicts[j].ExcludedReason {
 				if verdicts[i].IssuerKey == verdicts[j].IssuerKey {

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"xdao.co/catf/catf"
-	"xdao.co/catf/cidutil"
 	"xdao.co/catf/resolver"
 )
 
@@ -167,15 +166,14 @@ func TestVerdicts_AreCompleteAndSurfaced_DeterministicUnderShuffle(t *testing.T)
 		return v.ExcludedReason == "CATF-VAL-212"
 	}
 
-	badSigCID := cidutil.CIDv1RawSHA256(badSig)
+	badSigCID := mustCATFCID(t, badSig)
 	expected[badSigCID] = func(v resolver.Verdict) bool {
 		return v.ExcludedReason == "Signature invalid"
 	}
 
-	corruptCID := cidutil.CIDv1RawSHA256(corrupt)
-	expected[corruptCID] = func(v resolver.Verdict) bool {
-		return v.ExcludedReason == "CATF parse/canonicalization failed"
-	}
+	// Corrupt/non-canonical CATF bytes have no CATF identity (no CID).
+	// They must still surface as deterministic exclusions/verdicts.
+	wantEmptyCIDParseFails := 2
 
 	inputs := [][]byte{a1, u1, m1, badSig, corrupt, corrupt}
 	perms := permuteIndices(len(inputs))
@@ -187,15 +185,13 @@ func TestVerdicts_AreCompleteAndSurfaced_DeterministicUnderShuffle(t *testing.T)
 			var attCIDs []string
 			for _, i := range p {
 				attBytes = append(attBytes, inputs[i])
-				// Only canonical CATF bytes have a CATF CID; otherwise fall back to raw CID.
+				// Only canonical CATF bytes have a CATF CID.
 				if a, err := catf.Parse(inputs[i]); err == nil {
 					cid, cidErr := a.CID()
 					if cidErr != nil {
 						t.Fatalf("CID: %v", cidErr)
 					}
 					attCIDs = append(attCIDs, cid)
-				} else {
-					attCIDs = append(attCIDs, cidutil.CIDv1RawSHA256(inputs[i]))
 				}
 			}
 
@@ -206,14 +202,21 @@ func TestVerdicts_AreCompleteAndSurfaced_DeterministicUnderShuffle(t *testing.T)
 
 			// Assert verdict presence + reason for each expected CID.
 			seen := make(map[string]resolver.Verdict)
+			emptyCIDParseFails := 0
 			for _, v := range res.Verdicts {
 				if v.CID == "" {
+					if v.ExcludedReason == "CATF parse/canonicalization failed" {
+						emptyCIDParseFails++
+					}
 					continue
 				}
 				// Keep the first; duplicates are allowed.
 				if _, ok := seen[v.CID]; !ok {
 					seen[v.CID] = v
 				}
+			}
+			if emptyCIDParseFails != wantEmptyCIDParseFails {
+				t.Fatalf("expected %d empty-CID parse failures, got %d", wantEmptyCIDParseFails, emptyCIDParseFails)
 			}
 			for cid, check := range expected {
 				v, ok := seen[cid]

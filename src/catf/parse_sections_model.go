@@ -85,7 +85,7 @@ func parseSectionsModelV1(data []byte) (*parsedSections, error) {
 				return nil, err
 			}
 			sectionIndex++
-			if sectionIndex >= len(SectionOrder) || SectionOrder[sectionIndex] != line {
+			if sectionIndex >= len(canonicalSectionOrder) || canonicalSectionOrder[sectionIndex] != line {
 				return nil, newError(KindParse, "CATF-STR-020", "sections missing or out of order")
 			}
 			if sectionIndex == 0 {
@@ -164,7 +164,7 @@ func parseSectionsModelV1(data []byte) (*parsedSections, error) {
 		}
 	}
 
-	for _, s := range SectionOrder {
+	for _, s := range canonicalSectionOrder {
 		if !seenSection[s] {
 			return nil, newError(KindParse, "CATF-STR-020", "sections missing or out of order")
 		}

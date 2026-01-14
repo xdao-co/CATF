@@ -22,15 +22,15 @@ func TestNormalizeCATF_FromCRLFVector(t *testing.T) {
 		t.Fatalf("read CRLF vector: %v", err)
 	}
 
-	norm, err := NormalizeCATF(crlfBytes)
-	if err != nil {
-		t.Fatalf("NormalizeCATF(CRLF): %v", err)
+	if _, err := Parse(crlfBytes); err == nil {
+		t.Fatalf("expected Parse(CRLF) to reject non-canonical bytes")
 	}
-	if !bytes.Equal(norm, canonicalBytes) {
-		t.Fatalf("normalized bytes mismatch vs canonical vector")
+	if _, err := NormalizeCATF(crlfBytes); err == nil {
+		t.Fatalf("expected NormalizeCATF(CRLF) to reject non-canonical bytes")
 	}
-	if _, err := Parse(norm); err != nil {
-		t.Fatalf("Parse(normalized): %v", err)
+	// Canonical bytes remain accepted.
+	if _, err := NormalizeCATF(canonicalBytes); err != nil {
+		t.Fatalf("NormalizeCATF(canonical): %v", err)
 	}
 }
 
@@ -79,24 +79,25 @@ func TestNormalizeCATF_SortsKeys(t *testing.T) {
 		Subject: map[string]string{"CID": "bafy-doc-1", "Description": "d"},
 		Claims:  map[string]string{"Role": "author", "Type": "authorship"},
 		Crypto: map[string]string{
-			"Hash-Alg":       "sha256",
-			"Issuer-Key":     "ed25519:AA==",
-			"Signature":      "AA==",
-			"Signature-Alg":  "ed25519",
+			"Hash-Alg":      "sha256",
+			"Issuer-Key":    "ed25519:AA==",
+			"Signature":     "AA==",
+			"Signature-Alg": "ed25519",
 		},
 	})
 	if err != nil {
 		t.Fatalf("Render(expected): %v", err)
 	}
 
-	norm, err := NormalizeCATF(nonCanonical)
+	if _, err := NormalizeCATF(nonCanonical); err == nil {
+		t.Fatalf("expected NormalizeCATF to reject unsorted keys variant")
+	}
+	// Canonical bytes remain accepted.
+	norm, err := NormalizeCATF(expectedCanonical)
 	if err != nil {
-		t.Fatalf("NormalizeCATF(unsorted keys): %v", err)
+		t.Fatalf("NormalizeCATF(expected canonical): %v", err)
 	}
 	if !bytes.Equal(norm, expectedCanonical) {
-		t.Fatalf("NormalizeCATF did not produce expected canonical bytes")
-	}
-	if _, err := Parse(norm); err != nil {
-		t.Fatalf("Parse(normalized): %v", err)
+		t.Fatalf("NormalizeCATF should be identity on canonical bytes")
 	}
 }

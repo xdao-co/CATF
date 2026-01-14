@@ -9,8 +9,14 @@ import (
 	"xdao.co/catf/cidutil"
 )
 
+var canonicalSectionOrder = []string{"META", "SUBJECT", "CLAIMS", "CRYPTO"}
+
 // SectionOrder defines the canonical order of CATF sections.
-var SectionOrder = []string{"META", "SUBJECT", "CLAIMS", "CRYPTO"}
+//
+// NOTE: This value is informational for consumers. Mutating it does not change
+// parser/canonicalization behavior; the reference implementation uses an
+// internal immutable section order to preserve determinism.
+var SectionOrder = append([]string(nil), canonicalSectionOrder...)
 
 // CATF represents a parsed CATF attestation.
 type CATF struct {
@@ -135,7 +141,7 @@ func (c *CATF) IssuerKey() string {
 }
 
 func isSectionHeader(line string) bool {
-	for _, s := range SectionOrder {
+	for _, s := range canonicalSectionOrder {
 		if line == s {
 			return true
 		}

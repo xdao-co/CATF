@@ -142,7 +142,7 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	// EXCLUSIONS
 	sb.WriteString("EXCLUSIONS\n")
 	ex := append([]resolver.Exclusion(nil), res.Exclusions...)
-	sort.Slice(ex, func(i, j int) bool {
+	sort.SliceStable(ex, func(i, j int) bool {
 		if ex[i].CID == ex[j].CID {
 			return ex[i].Reason < ex[j].Reason
 		}
@@ -163,7 +163,7 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	// VERDICTS
 	sb.WriteString("VERDICTS\n")
 	verdicts := append([]resolver.Verdict(nil), res.Verdicts...)
-	sort.Slice(verdicts, func(i, j int) bool {
+	sort.SliceStable(verdicts, func(i, j int) bool {
 		if verdicts[i].CID == verdicts[j].CID {
 			if verdicts[i].ExcludedReason == verdicts[j].ExcludedReason {
 				if verdicts[i].IssuerKey == verdicts[j].IssuerKey {

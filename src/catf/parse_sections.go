@@ -17,6 +17,7 @@ func parseSectionsV1(data []byte) (*parsedSections, error) {
 	sections := make(map[string]Section)
 	reader := bufio.NewReader(bytes.NewReader(data))
 	lineNo := 0
+	sectionOrder := canonicalSectionOrder
 	readLine := func() (string, error) {
 		l, err := reader.ReadString('\n')
 		if err == io.EOF {
@@ -100,7 +101,7 @@ func parseSectionsV1(data []byte) (*parsedSections, error) {
 				return nil, err
 			}
 			sectionIndex++
-			if sectionIndex >= len(SectionOrder) || SectionOrder[sectionIndex] != line {
+			if sectionIndex >= len(sectionOrder) || sectionOrder[sectionIndex] != line {
 				return nil, newError(KindParse, "CATF-STR-020", "sections missing or out of order")
 			}
 			if sectionIndex == 0 {
@@ -180,7 +181,7 @@ func parseSectionsV1(data []byte) (*parsedSections, error) {
 		}
 	}
 
-	for _, s := range SectionOrder {
+	for _, s := range canonicalSectionOrder {
 		if !seenSection[s] {
 			return nil, newError(KindParse, "CATF-STR-020", "sections missing or out of order")
 		}
