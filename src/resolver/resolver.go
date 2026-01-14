@@ -1,4 +1,6 @@
 // Package resolver implements the Deterministic Resolver Contract (DRC).
+//
+// API stability: see STABILITY.md (repository root) for Stable vs Experimental tiers.
 package resolver
 
 import (

@@ -36,6 +36,20 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
   - `Render`, `CID`, `ValidateSupersession`
   - `RenderWithCompliance` (strict output compliance gate)
 
+- Package `xdao.co/catf/tpdl`
+  - `Parse([]byte) (*Policy, error)` and policy model types
+
+- Package `xdao.co/catf/cidutil`
+  - `CIDv1RawSHA256([]byte) string`
+
+- Package `xdao.co/catf/compliance`
+  - `ComplianceMode` (`Permissive`, `Strict`)
+
+- Package `xdao.co/catf/keys` (pure primitives only)
+  - `GenerateIssuerKeyFromSeed([]byte) string`
+  - `DeriveRoleSeed([]byte, string) ([]byte, error)`
+  - `IssuerKeyFromPublicKey(ed25519.PublicKey) (string, error)`
+
 ### Experimental
 
 Experimental APIs MAY change in MINOR releases.
@@ -44,11 +58,22 @@ They should be used with pinning and explicit upgrade review.
 - Package `xdao.co/catf/catf`
   - `NormalizeCATF([]byte) ([]byte, error)` (model-first canonicalization helper)
 
+- Package `xdao.co/catf/keys`
+  - Filesystem-backed key storage and convenience helpers (`KeyStore`, `CreateKeyStore`, etc.)
+  - These are intentionally local-first utilities and may change independently of the protocol core.
+
 - Packages under `xdao.co/catf/internal/...`
+
+- Package `xdao.co/catf/cmd/xdao-catf` (CLI; not a library API)
 
 ### Internal
 
 Internal APIs are not for external consumption and may change at any time.
+
+- Package `xdao.co/catf/catf`
+  - Rule-engine plumbing (`Rule`, `ValidateRules`, `ValidateRulesAll`) is UNSUPPORTED for downstream use.
+    These symbols are exported for reference implementation composition and tests, but are not part of
+    the stable protocol-facing library surface.
 
 ## Required Processing Pipeline
 

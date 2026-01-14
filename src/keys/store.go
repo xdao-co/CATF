@@ -13,6 +13,9 @@ import (
 
 // KeyStore represents a simple local-first key management system.
 //
+// EXPERIMENTAL (GAP-07): this filesystem-backed storage surface is not part of the
+// stable protocol core API and may change in MINOR releases.
+//
 // Features:
 // - Supports Ed25519 keys only
 // - Stores keys on the local filesystem

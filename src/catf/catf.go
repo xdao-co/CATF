@@ -1,4 +1,6 @@
 // Package catf implements parsing and canonicalization for Canonical Attestation Text Format (CATF).
+//
+// API stability: see STABILITY.md (repository root) for Stable vs Experimental tiers.
 package catf
 
 import (

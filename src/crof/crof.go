@@ -1,4 +1,6 @@
 // Package crof implements the Canonical Resolver Output Format (CROF).
+//
+// API stability: see STABILITY.md (repository root) for Stable vs Experimental tiers.
 package crof
 
 import (
