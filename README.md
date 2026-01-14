@@ -130,6 +130,13 @@ A platform for decentralized coordination based on evidence, policy, and determi
 - Spec compliance: the ReferenceDesign.md §19 test vectors run under `go test ./...`.
 - Crypto agility: CATF verification supports `Signature-Alg: ed25519 | dilithium3` and `Hash-Alg: sha256 | sha512 | sha3-256`.
 
+## Integration-facing behavior notes
+
+- CATF canonical bytes are the only identity: `catf.Parse` rejects any non-canonical input bytes (e.g. CRLF, BOM, trailing newline).
+- Canonicalization is not an auto-fix: `catf.CanonicalizeCATF` and `catf.NormalizeCATF` reject non-canonical inputs rather than rewriting them.
+- Resolver evidence for invalid inputs: when an input attestation fails CATF parse/canonicalization, the resolver surfaces it deterministically as an exclusion/verdict with an empty `CID` and reason `CATF parse/canonicalization failed`.
+- CROF rendering of empty CIDs: CROF omits `Attestation-CID: ...` lines when the CID is empty, but still renders `Reason:` / `Excluded-Reason:`.
+
 ## Documentation sync policy
 
 When changing behavior or formats in the reference implementation:

@@ -255,6 +255,10 @@ Operational guidance:
 - Store the final CATF bytes exactly (they are canonical; do not add a trailing newline).
 - Track the Attestation CID (`catf.Parse(finalBytes).CID()`) as the stable identifier.
 
+Important behavior note:
+
+- CATF is strict about canonical bytes. `catf.Parse` rejects any non-canonical input bytes (including CRLF line endings, UTF-8 BOM, or a trailing newline). Integrations should treat the exact CATF bytes as the artifact; do not “pretty print”, re-wrap, or otherwise rewrite them in transit.
+
 ---
 
 ## 7) Resolve (evaluate under policy)
@@ -344,6 +348,11 @@ Your application typically consumes:
 
 In addition, the resolver now emits per-attestation evidence as `res.Verdicts`, which the CROF renderer records in the `VERDICTS` section. This is useful for auditing *why* an attestation was excluded (untrusted, revoked, parse-failed, etc.) without re-running the resolver.
 
+Invalid / non-canonical attestation inputs:
+
+- If an input attestation fails CATF parse/canonicalization, the resolver will still surface it deterministically as an `EXCLUSIONS` + `VERDICTS` entry with an empty CID and `ExcludedReason: CATF parse/canonicalization failed`.
+- When rendering CROF, entries with an empty CID omit the `Attestation-CID: ...` line, but still include the corresponding `Reason:` / `Excluded-Reason:` lines.
+
 The CROF `RESULT` section also records `Subject-CID` to bind the output to the subject being resolved.
 
 Fork surfacing notes:
@@ -385,3 +394,4 @@ An external project usually needs to ship:
 - **Policy drift**: changing role names or trust mappings breaks resolution semantics.
 - **Using `ipfs add` when you expect `doc-cid`**: `ipfs add` typically yields a different CID (UnixFS DAG), while this system’s `doc-cid` / `ipfs put` is a raw-block CID over exact bytes.
 - **Shell `$` expansion**: if you embed dollar signs in claim values in bash, use single quotes (e.g. `'Good-Faith-Money=$10,000'`).
+- **Assuming malformed attestations have a CID**: invalid/non-canonical CATF bytes are not assigned an “attestation CID”; they surface as deterministic exclusions/verdicts with an empty CID.
