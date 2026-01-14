@@ -217,6 +217,11 @@ Resolves a subject CID under a policy and prints canonical CROF:
 ./bin/xdao-catf resolve --subject "$SUBJECT_CID" --policy ./policy.tpdl --att /tmp/a1.catf
 ```
 
+Notes:
+
+- Inputs must be canonical CATF bytes. If an input attestation is non-canonical (e.g. CRLF, BOM, trailing newline) or otherwise fails CATF parsing, it will still be surfaced in CROF evidence (`EXCLUSIONS` / `VERDICTS`) with an empty CID and a deterministic reason.
+- When the CID is empty, CROF omits the `Attestation-CID: ...` line for that entry, but still renders `Reason:` / `Excluded-Reason:`.
+
 Compliance mode:
 
 ```sh

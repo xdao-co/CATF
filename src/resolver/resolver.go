@@ -4,9 +4,10 @@
 package resolver
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"sort"
-	"strings"
 
 	"xdao.co/catf/catf"
 	"xdao.co/catf/tpdl"
@@ -39,6 +40,11 @@ type Resolution struct {
 	Forks      []Fork
 	Exclusions []Exclusion
 	Verdicts   []Verdict
+
+	// PolicyVerdicts materialize trust-policy requirement evaluation as durable evidence.
+	// This allows consumers to distinguish missing/insufficient evidence from other failures
+	// without re-running the resolver.
+	PolicyVerdicts []PolicyVerdict
 }
 
 type Path struct {
@@ -52,24 +58,42 @@ type Fork struct {
 }
 
 type Exclusion struct {
-	CID    string
-	Reason string
+	CID       string
+	InputHash string // stable handle for invalid/unparseable inputs (not a CATF CID)
+	Reason    string
 }
+
+type VerdictStatus string
+
+const (
+	VerdictTrusted   VerdictStatus = "Trusted"
+	VerdictUntrusted VerdictStatus = "Untrusted"
+	VerdictInvalid   VerdictStatus = "Invalid"
+	VerdictRevoked   VerdictStatus = "Revoked"
+)
 
 // Verdict is an explicit per-attestation policy/trust evaluation record.
 //
 // These are intended to be surfaced as evidence (e.g. in CROF) so callers do
 // not need to reverse-engineer resolver decisions from a final Path/Fork alone.
 type Verdict struct {
-	CID       string
-	IssuerKey string
-	ClaimType string
+	CID                string
+	InputHash          string // stable handle for invalid/unparseable inputs (not a CATF CID)
+	AttestedSubjectCID string
+	IssuerKey          string
+	ClaimType          string
 
 	Trusted    bool
 	TrustRoles []string
 	Revoked    bool
+	RevokedBy  []string
 
-	ExcludedReason string // empty when not excluded at ingestion
+	// Status and Reasons are explicit, durable evidence of why this attestation was trusted,
+	// rejected, revoked, or considered invalid.
+	Status  VerdictStatus
+	Reasons []string
+
+	ExcludedReason string // retained for compatibility; also included in Reasons when set
 }
 
 type attestation struct {
@@ -78,6 +102,14 @@ type attestation struct {
 	trusted    bool
 	trustRoles map[string]bool
 	revoked    bool
+	revokedBy  []string
+}
+
+// inputHash computes a stable, non-CID handle for raw input bytes.
+// This is used only when an attestation has no CATF identity (e.g. parse/canonicalization failure).
+func inputHash(b []byte) string {
+	sum := sha256.Sum256(b)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 // Resolve parses inputs and produces a deterministic resolution for a single subject CID.
@@ -101,30 +133,41 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 		a, perr := catf.Parse(b)
 		if perr != nil {
 			v.CID = ""
+			v.InputHash = inputHash(b)
+			v.Status = VerdictInvalid
 			v.ExcludedReason = "CATF parse/canonicalization failed"
+			v.Reasons = []string{v.ExcludedReason}
 			verdicts = append(verdicts, v)
-			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
+			exclusions = append(exclusions, Exclusion{CID: v.CID, InputHash: v.InputHash, Reason: v.ExcludedReason})
 			continue
 		}
 		cid, err := a.CID()
 		if err != nil {
 			v.CID = ""
+			v.InputHash = inputHash(b)
+			v.Status = VerdictInvalid
 			v.ExcludedReason = "CATF parse/canonicalization failed"
+			v.Reasons = []string{v.ExcludedReason}
 			verdicts = append(verdicts, v)
-			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
+			exclusions = append(exclusions, Exclusion{CID: v.CID, InputHash: v.InputHash, Reason: v.ExcludedReason})
 			continue
 		}
 		v.CID = cid
+		v.AttestedSubjectCID = a.SubjectCID()
 		v.IssuerKey = a.IssuerKey()
 		v.ClaimType = a.ClaimType()
 		if err := catf.ValidateCoreClaims(a); err != nil {
+			v.Status = VerdictInvalid
 			v.ExcludedReason = stableCATFReason(err)
+			v.Reasons = []string{v.ExcludedReason}
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
 		}
 		if err := a.Verify(); err != nil {
+			v.Status = VerdictInvalid
 			v.ExcludedReason = "Signature invalid"
+			v.Reasons = []string{v.ExcludedReason}
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
@@ -138,8 +181,12 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 				v.TrustRoles = append(v.TrustRoles, r)
 			}
 			sort.Strings(v.TrustRoles)
+			v.Status = VerdictTrusted
+			v.Reasons = []string{"Issuer trusted by policy"}
 		} else {
+			v.Status = VerdictUntrusted
 			v.ExcludedReason = "Issuer not trusted"
+			v.Reasons = []string{v.ExcludedReason}
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 		}
 		if att.trusted && a.ClaimType() == "supersedes" && len(policy.SupersedesAllowedBy) > 0 {
@@ -154,7 +201,9 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 				att.trusted = false
 				v.Trusted = false
 				v.TrustRoles = nil
+				v.Status = VerdictUntrusted
 				v.ExcludedReason = "Supersedes not allowed by policy"
+				v.Reasons = []string{v.ExcludedReason}
 				exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			}
 		}
@@ -171,29 +220,18 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 		}
 		if idx, ok := verdictIndex[a.cid]; ok {
 			verdicts[idx].Revoked = true
+			if len(a.revokedBy) > 0 {
+				verdicts[idx].RevokedBy = appendUniqueSorted(append([]string(nil), a.revokedBy...))
+			}
+			// Preserve existing trust fields, but make revocation explicit in status/reasons.
+			verdicts[idx].Status = VerdictRevoked
+			verdicts[idx].Reasons = appendUniqueSorted(verdicts[idx].Reasons, "Revoked")
 		}
 	}
-	sort.SliceStable(verdicts, func(i, j int) bool {
-		if verdicts[i].CID == verdicts[j].CID {
-			if verdicts[i].ExcludedReason == verdicts[j].ExcludedReason {
-				if verdicts[i].IssuerKey == verdicts[j].IssuerKey {
-					if verdicts[i].ClaimType == verdicts[j].ClaimType {
-						if verdicts[i].Trusted == verdicts[j].Trusted {
-							if verdicts[i].Revoked == verdicts[j].Revoked {
-								return strings.Join(verdicts[i].TrustRoles, ",") < strings.Join(verdicts[j].TrustRoles, ",")
-							}
-							return !verdicts[i].Revoked && verdicts[j].Revoked
-						}
-						return verdicts[i].Trusted && !verdicts[j].Trusted
-					}
-					return verdicts[i].ClaimType < verdicts[j].ClaimType
-				}
-				return verdicts[i].IssuerKey < verdicts[j].IssuerKey
-			}
-			return verdicts[i].ExcludedReason < verdicts[j].ExcludedReason
-		}
-		return verdicts[i].CID < verdicts[j].CID
-	})
+	for i := range verdicts {
+		verdicts[i].Reasons = appendUniqueSorted(verdicts[i].Reasons)
+	}
+	sort.SliceStable(verdicts, func(i, j int) bool { return verdictLessV2(verdicts[i], verdicts[j]) })
 
 	// Only consider attestations about this subject.
 	var subjectAtts []*attestation
@@ -241,7 +279,9 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 		return res, nil
 	}
 
-	if !rulesSatisfied(policy, activeTrustedClaims) {
+	policyVerdicts, ok := evaluatePolicyRules(policy, activeTrustedClaims, "")
+	res.PolicyVerdicts = policyVerdicts
+	if !ok {
 		res.State = StateUnresolved
 		return res, nil
 	}
@@ -305,6 +345,7 @@ func applyRevocations(atts []*attestation) {
 		}
 		if t, ok := byCID[target]; ok {
 			t.revoked = true
+			t.revokedBy = appendUniqueSorted(t.revokedBy, a.cid)
 		}
 	}
 }

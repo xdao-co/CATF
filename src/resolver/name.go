@@ -2,7 +2,6 @@ package resolver
 
 import (
 	"sort"
-	"strings"
 
 	"xdao.co/catf/catf"
 	"xdao.co/catf/tpdl"
@@ -23,6 +22,8 @@ type NameResolution struct {
 	Forks      []NameFork
 	Exclusions []Exclusion
 	Verdicts   []Verdict
+
+	PolicyVerdicts []PolicyVerdict
 }
 
 type NameFork struct {
@@ -49,30 +50,41 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 		a, perr := catf.Parse(b)
 		if perr != nil {
 			v.CID = ""
+			v.InputHash = inputHash(b)
+			v.Status = VerdictInvalid
 			v.ExcludedReason = "CATF parse/canonicalization failed"
+			v.Reasons = []string{stableCATFReason(perr)}
 			verdicts = append(verdicts, v)
-			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
+			exclusions = append(exclusions, Exclusion{CID: v.CID, InputHash: v.InputHash, Reason: v.ExcludedReason})
 			continue
 		}
 		cid, err := a.CID()
 		if err != nil {
 			v.CID = ""
+			v.InputHash = inputHash(b)
+			v.Status = VerdictInvalid
 			v.ExcludedReason = "CATF parse/canonicalization failed"
+			v.Reasons = []string{stableCATFReason(err)}
 			verdicts = append(verdicts, v)
-			exclusions = append(exclusions, Exclusion{CID: v.CID, Reason: v.ExcludedReason})
+			exclusions = append(exclusions, Exclusion{CID: v.CID, InputHash: v.InputHash, Reason: v.ExcludedReason})
 			continue
 		}
 		v.CID = cid
 		v.IssuerKey = a.IssuerKey()
 		v.ClaimType = a.ClaimType()
+		v.AttestedSubjectCID = a.SubjectCID()
 		if err := catf.ValidateCoreClaims(a); err != nil {
+			v.Status = VerdictInvalid
 			v.ExcludedReason = stableCATFReason(err)
+			v.Reasons = []string{v.ExcludedReason}
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
 		}
 		if err := a.Verify(); err != nil {
+			v.Status = VerdictInvalid
 			v.ExcludedReason = "Signature invalid"
+			v.Reasons = []string{v.ExcludedReason}
 			verdicts = append(verdicts, v)
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 			continue
@@ -82,12 +94,16 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 			att.trusted = true
 			att.trustRoles = roles
 			v.Trusted = true
+			v.Status = VerdictTrusted
+			v.Reasons = []string{"Issuer trusted by policy"}
 			for r := range roles {
 				v.TrustRoles = append(v.TrustRoles, r)
 			}
 			sort.Strings(v.TrustRoles)
 		} else {
+			v.Status = VerdictUntrusted
 			v.ExcludedReason = "Issuer not trusted"
+			v.Reasons = []string{v.ExcludedReason}
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
 		}
 		verdictIndex[cid] = len(verdicts)
@@ -103,29 +119,17 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 		}
 		if idx, ok := verdictIndex[a.cid]; ok {
 			verdicts[idx].Revoked = true
+			if len(a.revokedBy) > 0 {
+				verdicts[idx].RevokedBy = appendUniqueSorted(append([]string(nil), a.revokedBy...))
+			}
+			verdicts[idx].Status = VerdictRevoked
+			verdicts[idx].Reasons = appendUniqueSorted(verdicts[idx].Reasons, "Revoked")
 		}
 	}
-	sort.SliceStable(verdicts, func(i, j int) bool {
-		if verdicts[i].CID == verdicts[j].CID {
-			if verdicts[i].ExcludedReason == verdicts[j].ExcludedReason {
-				if verdicts[i].IssuerKey == verdicts[j].IssuerKey {
-					if verdicts[i].ClaimType == verdicts[j].ClaimType {
-						if verdicts[i].Trusted == verdicts[j].Trusted {
-							if verdicts[i].Revoked == verdicts[j].Revoked {
-								return strings.Join(verdicts[i].TrustRoles, ",") < strings.Join(verdicts[j].TrustRoles, ",")
-							}
-							return !verdicts[i].Revoked && verdicts[j].Revoked
-						}
-						return verdicts[i].Trusted && !verdicts[j].Trusted
-					}
-					return verdicts[i].ClaimType < verdicts[j].ClaimType
-				}
-				return verdicts[i].IssuerKey < verdicts[j].IssuerKey
-			}
-			return verdicts[i].ExcludedReason < verdicts[j].ExcludedReason
-		}
-		return verdicts[i].CID < verdicts[j].CID
-	})
+	for i := range verdicts {
+		verdicts[i].Reasons = appendUniqueSorted(verdicts[i].Reasons)
+	}
+	sort.SliceStable(verdicts, func(i, j int) bool { return verdictLessV2(verdicts[i], verdicts[j]) })
 
 	res := &NameResolution{Name: name, Version: version, Confidence: ConfidenceUndefined, Exclusions: exclusions, Verdicts: verdicts}
 
@@ -165,7 +169,9 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 	// Apply trust policy quorum/role requirements to name-binding evidence.
 	// Without this, name resolution could incorrectly resolve with insufficient
 	// trusted issuers for the required roles.
-	if !rulesSatisfiedForType(policy, candidates, "name-binding") {
+	policyVerdicts, ok := evaluatePolicyRules(policy, candidates, "name-binding")
+	res.PolicyVerdicts = policyVerdicts
+	if !ok {
 		res.State = StateUnresolved
 		res.Confidence = ConfidenceUndefined
 		return res, nil
