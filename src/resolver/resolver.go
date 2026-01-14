@@ -66,10 +66,13 @@ type Exclusion struct {
 type VerdictStatus string
 
 const (
-	VerdictTrusted   VerdictStatus = "Trusted"
-	VerdictUntrusted VerdictStatus = "Untrusted"
-	VerdictInvalid   VerdictStatus = "Invalid"
-	VerdictRevoked   VerdictStatus = "Revoked"
+	VerdictTrusted  VerdictStatus = "Trusted"
+	VerdictExcluded VerdictStatus = "Excluded"
+	VerdictInvalid  VerdictStatus = "Invalid"
+	VerdictRevoked  VerdictStatus = "Revoked"
+
+	// VerdictUntrusted is retained for compatibility; "Excluded" is the canonical status.
+	VerdictUntrusted VerdictStatus = VerdictExcluded
 )
 
 // Verdict is an explicit per-attestation policy/trust evaluation record.
@@ -184,7 +187,7 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 			v.Status = VerdictTrusted
 			v.Reasons = []string{"Issuer trusted by policy"}
 		} else {
-			v.Status = VerdictUntrusted
+			v.Status = VerdictExcluded
 			v.ExcludedReason = "Issuer not trusted"
 			v.Reasons = []string{v.ExcludedReason}
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
@@ -201,7 +204,7 @@ func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (
 				att.trusted = false
 				v.Trusted = false
 				v.TrustRoles = nil
-				v.Status = VerdictUntrusted
+				v.Status = VerdictExcluded
 				v.ExcludedReason = "Supersedes not allowed by policy"
 				v.Reasons = []string{v.ExcludedReason}
 				exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})

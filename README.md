@@ -134,8 +134,8 @@ A platform for decentralized coordination based on evidence, policy, and determi
 
 - CATF canonical bytes are the only identity: `catf.Parse` rejects any non-canonical input bytes (e.g. CRLF, BOM, trailing newline).
 - Canonicalization is not an auto-fix: `catf.CanonicalizeCATF` and `catf.NormalizeCATF` reject non-canonical inputs rather than rewriting them.
-- Resolver evidence for invalid inputs: when an input attestation fails CATF parse/canonicalization, the resolver surfaces it deterministically as an exclusion/verdict with an empty `CID` and reason `CATF parse/canonicalization failed`.
-- CROF rendering of empty CIDs: CROF omits `Attestation-CID: ...` lines when the CID is empty, but still renders `Reason:` / `Excluded-Reason:`.
+- Resolver evidence for invalid inputs: when an input attestation fails CATF parse/canonicalization, the resolver surfaces it deterministically as an exclusion/verdict with an empty `CID`, an `InputHash` of the form `sha256:<hex>`, and reason `CATF parse/canonicalization failed`.
+- CROF rendering of invalid/unknown inputs: CROF omits `Attestation-CID: ...` lines when the CID is empty, but still renders `Input-Hash: sha256:<hex>` (when available) plus `Reason:` / `Excluded-Reason:`.
 
 ## Documentation sync policy
 

@@ -219,8 +219,10 @@ Resolves a subject CID under a policy and prints canonical CROF:
 
 Notes:
 
-- Inputs must be canonical CATF bytes. If an input attestation is non-canonical (e.g. CRLF, BOM, trailing newline) or otherwise fails CATF parsing, it will still be surfaced in CROF evidence (`EXCLUSIONS` / `VERDICTS`) with an empty CID and a deterministic reason.
-- When the CID is empty, CROF omits the `Attestation-CID: ...` line for that entry, but still renders `Reason:` / `Excluded-Reason:`.
+- Inputs are not required to be valid CATF bytes.
+- If an input attestation is non-canonical (e.g. CRLF, BOM, trailing newline) or otherwise fails CATF parsing, it is surfaced deterministically in CROF evidence (`EXCLUSIONS` / `VERDICTS`) with an empty CID, an `Input-Hash: sha256:<hex>`, and a deterministic reason.
+- When the CID is empty, CROF omits the `Attestation-CID: ...` line for that entry, but still renders `Input-Hash:` (when available) plus `Reason:` / `Excluded-Reason:`.
+- CROF `INPUTS` binds all input identifiers and may include both `Attestation-CID:` and `Input-Hash:` lines.
 
 Compliance mode:
 

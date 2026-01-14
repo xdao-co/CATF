@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -790,17 +792,14 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 			return 1
 		}
 		attBytes = append(attBytes, b)
-		a, perr := catf.Parse(b)
-		if perr != nil {
-			fmt.Fprintf(errOut, "invalid CATF attestation %s: %v\n", p, perr)
-			return 2
+		if a, perr := catf.Parse(b); perr == nil {
+			if cid, err := a.CID(); err == nil {
+				attCIDs = append(attCIDs, cid)
+				continue
+			}
 		}
-		cid, err := a.CID()
-		if err != nil {
-			fmt.Fprintf(errOut, "cid for %s: %v\n", p, err)
-			return 1
-		}
-		attCIDs = append(attCIDs, cid)
+		sum := sha256.Sum256(b)
+		attCIDs = append(attCIDs, "sha256:"+hex.EncodeToString(sum[:]))
 	}
 
 	res, err := resolver.ResolveWithOptions(attBytes, policyBytes, subjectCID, opts)
@@ -898,17 +897,14 @@ func cmdResolveName(args []string, out io.Writer, errOut io.Writer) int {
 			return 1
 		}
 		attBytes = append(attBytes, b)
-		a, perr := catf.Parse(b)
-		if perr != nil {
-			fmt.Fprintf(errOut, "invalid CATF attestation %s: %v\n", p, perr)
-			return 2
+		if a, perr := catf.Parse(b); perr == nil {
+			if cid, err := a.CID(); err == nil {
+				attCIDs = append(attCIDs, cid)
+				continue
+			}
 		}
-		cid, err := a.CID()
-		if err != nil {
-			fmt.Fprintf(errOut, "cid for %s: %v\n", p, err)
-			return 1
-		}
-		attCIDs = append(attCIDs, cid)
+		sum := sha256.Sum256(b)
+		attCIDs = append(attCIDs, "sha256:"+hex.EncodeToString(sum[:]))
 	}
 
 	nameRes, err := resolver.ResolveNameWithOptions(attBytes, policyBytes, name, version, opts)

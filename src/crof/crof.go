@@ -52,8 +52,18 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 		resolverID = "xdao-resolver-reference"
 	}
 
-	attCIDs := append([]string(nil), attestationCIDs...)
+	inputIDs := append([]string(nil), attestationCIDs...)
+	var attCIDs []string
+	var inputHashes []string
+	for _, id := range inputIDs {
+		if strings.HasPrefix(id, "sha256:") {
+			inputHashes = append(inputHashes, id)
+			continue
+		}
+		attCIDs = append(attCIDs, id)
+	}
 	sort.Strings(attCIDs)
+	sort.Strings(inputHashes)
 
 	var sb strings.Builder
 	sb.WriteString(Preamble)
@@ -89,6 +99,11 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 		sb.WriteString(cid)
 		sb.WriteString("\n")
 	}
+	for _, h := range inputHashes {
+		sb.WriteString("Input-Hash: ")
+		sb.WriteString(h)
+		sb.WriteString("\n")
+	}
 	sb.WriteString("\n")
 
 	// RESULT
@@ -97,6 +112,38 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 		"Subject-CID: " + res.SubjectCID,
 		"Confidence: " + string(res.Confidence),
 		"State: " + string(res.State),
+	}
+	if len(res.PolicyVerdicts) > 0 {
+		pvs := append([]resolver.PolicyVerdict(nil), res.PolicyVerdicts...)
+		sort.Slice(pvs, func(i, j int) bool {
+			if pvs[i].Type == pvs[j].Type {
+				if pvs[i].Role == pvs[j].Role {
+					return pvs[i].Quorum < pvs[j].Quorum
+				}
+				return pvs[i].Role < pvs[j].Role
+			}
+			return pvs[i].Type < pvs[j].Type
+		})
+		for _, pv := range pvs {
+			resultLines = append(resultLines, fmt.Sprintf(
+				"Policy-Verdict: Type=%s; Role=%s; Quorum=%d; Observed=%d; Satisfied=%t",
+				pv.Type, pv.Role, pv.Quorum, pv.Observed, pv.Satisfied,
+			))
+			issuerKeys := uniqueSorted(pv.IssuerKeys)
+			for _, k := range issuerKeys {
+				resultLines = append(resultLines, fmt.Sprintf(
+					"Policy-Issuer-Key: Type=%s; Role=%s; Issuer-Key=%s",
+					pv.Type, pv.Role, k,
+				))
+			}
+			reasons := uniqueSorted(pv.Reasons)
+			for _, r := range reasons {
+				resultLines = append(resultLines, fmt.Sprintf(
+					"Policy-Verdict-Reason: Type=%s; Role=%s; Reason=%s",
+					pv.Type, pv.Role, r,
+				))
+			}
+		}
 	}
 	sort.Strings(resultLines)
 	for _, l := range resultLines {
@@ -144,7 +191,10 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	ex := append([]resolver.Exclusion(nil), res.Exclusions...)
 	sort.SliceStable(ex, func(i, j int) bool {
 		if ex[i].CID == ex[j].CID {
-			return ex[i].Reason < ex[j].Reason
+			if ex[i].InputHash == ex[j].InputHash {
+				return ex[i].Reason < ex[j].Reason
+			}
+			return ex[i].InputHash < ex[j].InputHash
 		}
 		return ex[i].CID < ex[j].CID
 	})
@@ -152,6 +202,11 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 		if e.CID != "" {
 			sb.WriteString("Attestation-CID: ")
 			sb.WriteString(e.CID)
+			sb.WriteString("\n")
+		}
+		if e.InputHash != "" {
+			sb.WriteString("Input-Hash: ")
+			sb.WriteString(e.InputHash)
 			sb.WriteString("\n")
 		}
 		sb.WriteString("Reason: ")
@@ -163,31 +218,29 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	// VERDICTS
 	sb.WriteString("VERDICTS\n")
 	verdicts := append([]resolver.Verdict(nil), res.Verdicts...)
-	sort.SliceStable(verdicts, func(i, j int) bool {
-		if verdicts[i].CID == verdicts[j].CID {
-			if verdicts[i].ExcludedReason == verdicts[j].ExcludedReason {
-				if verdicts[i].IssuerKey == verdicts[j].IssuerKey {
-					if verdicts[i].ClaimType == verdicts[j].ClaimType {
-						if verdicts[i].Trusted == verdicts[j].Trusted {
-							if verdicts[i].Revoked == verdicts[j].Revoked {
-								return strings.Join(verdicts[i].TrustRoles, ",") < strings.Join(verdicts[j].TrustRoles, ",")
-							}
-							return !verdicts[i].Revoked && verdicts[j].Revoked
-						}
-						return verdicts[i].Trusted && !verdicts[j].Trusted
-					}
-					return verdicts[i].ClaimType < verdicts[j].ClaimType
-				}
-				return verdicts[i].IssuerKey < verdicts[j].IssuerKey
-			}
-			return verdicts[i].ExcludedReason < verdicts[j].ExcludedReason
+	for i := range verdicts {
+		verdicts[i].TrustRoles = uniqueSorted(verdicts[i].TrustRoles)
+		verdicts[i].RevokedBy = uniqueSorted(verdicts[i].RevokedBy)
+		verdicts[i].Reasons = uniqueSorted(verdicts[i].Reasons)
+		if len(verdicts[i].Reasons) == 0 && verdicts[i].ExcludedReason != "" {
+			verdicts[i].Reasons = []string{verdicts[i].ExcludedReason}
 		}
-		return verdicts[i].CID < verdicts[j].CID
-	})
+	}
+	sort.SliceStable(verdicts, func(i, j int) bool { return verdictLessV2(verdicts[i], verdicts[j]) })
 	for _, v := range verdicts {
 		if v.CID != "" {
 			sb.WriteString("Attestation-CID: ")
 			sb.WriteString(v.CID)
+			sb.WriteString("\n")
+		}
+		if v.InputHash != "" {
+			sb.WriteString("Input-Hash: ")
+			sb.WriteString(v.InputHash)
+			sb.WriteString("\n")
+		}
+		if v.AttestedSubjectCID != "" {
+			sb.WriteString("Attested-Subject-CID: ")
+			sb.WriteString(v.AttestedSubjectCID)
 			sb.WriteString("\n")
 		}
 		if v.IssuerKey != "" {
@@ -198,6 +251,11 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 		if v.ClaimType != "" {
 			sb.WriteString("Claim-Type: ")
 			sb.WriteString(v.ClaimType)
+			sb.WriteString("\n")
+		}
+		if v.Status != "" {
+			sb.WriteString("Status: ")
+			sb.WriteString(string(v.Status))
 			sb.WriteString("\n")
 		}
 		sb.WriteString("Trusted: ")
@@ -212,10 +270,18 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 		} else {
 			sb.WriteString("false\n")
 		}
-		roles := append([]string(nil), v.TrustRoles...)
-		sort.Strings(roles)
-		for _, r := range roles {
+		for _, cid := range v.RevokedBy {
+			sb.WriteString("Revoked-By: ")
+			sb.WriteString(cid)
+			sb.WriteString("\n")
+		}
+		for _, r := range v.TrustRoles {
 			sb.WriteString("Trust-Role: ")
+			sb.WriteString(r)
+			sb.WriteString("\n")
+		}
+		for _, r := range v.Reasons {
+			sb.WriteString("Reason: ")
 			sb.WriteString(r)
 			sb.WriteString("\n")
 		}
@@ -258,6 +324,65 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 	}
 
 	return out
+}
+
+func uniqueSorted(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, len(items))
+	out := make([]string, 0, len(items))
+	for _, s := range items {
+		if s == "" {
+			continue
+		}
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	sort.Strings(out)
+	return out
+}
+
+func verdictLessV2(a, b resolver.Verdict) bool {
+	if a.CID != b.CID {
+		return a.CID < b.CID
+	}
+	if a.InputHash != b.InputHash {
+		return a.InputHash < b.InputHash
+	}
+	if a.ExcludedReason != b.ExcludedReason {
+		return a.ExcludedReason < b.ExcludedReason
+	}
+	if a.IssuerKey != b.IssuerKey {
+		return a.IssuerKey < b.IssuerKey
+	}
+	if a.ClaimType != b.ClaimType {
+		return a.ClaimType < b.ClaimType
+	}
+	if a.AttestedSubjectCID != b.AttestedSubjectCID {
+		return a.AttestedSubjectCID < b.AttestedSubjectCID
+	}
+	if a.Status != b.Status {
+		return a.Status < b.Status
+	}
+	if a.Trusted != b.Trusted {
+		return a.Trusted && !b.Trusted
+	}
+	if a.Revoked != b.Revoked {
+		return !a.Revoked && b.Revoked
+	}
+	if strings.Join(a.TrustRoles, ",") != strings.Join(b.TrustRoles, ",") {
+		return strings.Join(a.TrustRoles, ",") < strings.Join(b.TrustRoles, ",")
+	}
+	if strings.Join(a.Reasons, ",") != strings.Join(b.Reasons, ",") {
+		return strings.Join(a.Reasons, ",") < strings.Join(b.Reasons, ",")
+	}
+	return strings.Join(a.RevokedBy, ",") < strings.Join(b.RevokedBy, ",")
 }
 
 // RenderWithCompliance renders CROF and enforces compliance-mode constraints.

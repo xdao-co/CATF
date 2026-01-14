@@ -350,8 +350,9 @@ In addition, the resolver now emits per-attestation evidence as `res.Verdicts`, 
 
 Invalid / non-canonical attestation inputs:
 
-- If an input attestation fails CATF parse/canonicalization, the resolver will still surface it deterministically as an `EXCLUSIONS` + `VERDICTS` entry with an empty CID and `ExcludedReason: CATF parse/canonicalization failed`.
-- When rendering CROF, entries with an empty CID omit the `Attestation-CID: ...` line, but still include the corresponding `Reason:` / `Excluded-Reason:` lines.
+- If an input attestation fails CATF parse/canonicalization, the resolver will still surface it deterministically as an `EXCLUSIONS` + `VERDICTS` entry with an empty CID, a stable `InputHash` (`sha256:<hex>`), and reason `CATF parse/canonicalization failed`.
+- When rendering CROF, entries with an empty CID omit the `Attestation-CID: ...` line, but still include `Input-Hash: sha256:<hex>` (when available) plus the corresponding `Reason:` / `Excluded-Reason:` lines.
+- CROF `INPUTS` may include both `Attestation-CID: ...` (valid CATF inputs) and `Input-Hash: sha256:<hex>` (invalid/non-CATF inputs). Canonical ordering is: all `Attestation-CID` lines first (sorted), then all `Input-Hash` lines (sorted).
 
 The CROF `RESULT` section also records `Subject-CID` to bind the output to the subject being resolved.
 

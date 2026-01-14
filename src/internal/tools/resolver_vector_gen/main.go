@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -9,7 +11,6 @@ import (
 	"strings"
 
 	"xdao.co/catf/catf"
-	"xdao.co/catf/cidutil"
 	"xdao.co/catf/crof"
 	"xdao.co/catf/resolver"
 )
@@ -67,7 +68,8 @@ func main() {
 				continue
 			}
 		}
-		attCIDs = append(attCIDs, cidutil.CIDv1RawSHA256(b))
+		sum := sha256.Sum256(b)
+		attCIDs = append(attCIDs, "sha256:"+hex.EncodeToString(sum[:]))
 	}
 	sort.Strings(attCIDs)
 

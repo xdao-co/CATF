@@ -181,19 +181,39 @@ func validateInputs(body []string) error {
 		return errors.New("INPUTS: invalid Trust-Policy-CID")
 	}
 	var att []string
+	var hashes []string
+	seenHash := false
 	for i := 1; i < len(body); i++ {
-		if !strings.HasPrefix(body[i], "Attestation-CID: ") {
-			return errors.New("INPUTS: unexpected line")
+		if strings.HasPrefix(body[i], "Attestation-CID: ") {
+			if seenHash {
+				return errors.New("INPUTS: Attestation-CID after Input-Hash")
+			}
+			_, v, err := validateKVLine(body[i])
+			if err != nil || v == "" {
+				return errors.New("INPUTS: invalid Attestation-CID")
+			}
+			att = append(att, v)
+			continue
 		}
-		_, v, err := validateKVLine(body[i])
-		if err != nil || v == "" {
-			return errors.New("INPUTS: invalid Attestation-CID")
+		if strings.HasPrefix(body[i], "Input-Hash: ") {
+			seenHash = true
+			_, v, err := validateKVLine(body[i])
+			if err != nil || v == "" {
+				return errors.New("INPUTS: invalid Input-Hash")
+			}
+			hashes = append(hashes, v)
+			continue
 		}
-		att = append(att, v)
+		return errors.New("INPUTS: unexpected line")
 	}
 	for i := 1; i < len(att); i++ {
 		if att[i-1] > att[i] {
 			return errors.New("INPUTS: Attestation-CID not sorted")
+		}
+	}
+	for i := 1; i < len(hashes); i++ {
+		if hashes[i-1] > hashes[i] {
+			return errors.New("INPUTS: Input-Hash not sorted")
 		}
 	}
 	return nil
@@ -290,6 +310,7 @@ func validateForks(body []string) error {
 
 type exclusionRecord struct {
 	cid    string
+	hash   string
 	reason string
 }
 
@@ -301,13 +322,33 @@ func validateExclusions(body []string) error {
 	i := 0
 	for i < len(body) {
 		cid := ""
-		if strings.HasPrefix(body[i], "Attestation-CID: ") {
-			_, v, err := validateKVLine(body[i])
-			if err != nil {
-				return fmt.Errorf("EXCLUSIONS: %w", err)
+		hash := ""
+		for i < len(body) {
+			if strings.HasPrefix(body[i], "Attestation-CID: ") {
+				if cid != "" {
+					return errors.New("EXCLUSIONS: duplicate Attestation-CID")
+				}
+				_, v, err := validateKVLine(body[i])
+				if err != nil {
+					return fmt.Errorf("EXCLUSIONS: %w", err)
+				}
+				cid = v
+				i++
+				continue
 			}
-			cid = v
-			i++
+			if strings.HasPrefix(body[i], "Input-Hash: ") {
+				if hash != "" {
+					return errors.New("EXCLUSIONS: duplicate Input-Hash")
+				}
+				_, v, err := validateKVLine(body[i])
+				if err != nil {
+					return fmt.Errorf("EXCLUSIONS: %w", err)
+				}
+				hash = v
+				i++
+				continue
+			}
+			break
 		}
 		if i >= len(body) || !strings.HasPrefix(body[i], "Reason: ") {
 			return errors.New("EXCLUSIONS: expected Reason")
@@ -316,13 +357,19 @@ func validateExclusions(body []string) error {
 		if err != nil {
 			return fmt.Errorf("EXCLUSIONS: %w", err)
 		}
-		recs = append(recs, exclusionRecord{cid: cid, reason: reason})
+		recs = append(recs, exclusionRecord{cid: cid, hash: hash, reason: reason})
 		i++
 	}
 	for i := 1; i < len(recs); i++ {
 		p, c := recs[i-1], recs[i]
 		if p.cid == c.cid {
-			if p.reason > c.reason {
+			if p.hash == c.hash {
+				if p.reason > c.reason {
+					return errors.New("EXCLUSIONS: not sorted")
+				}
+				continue
+			}
+			if p.hash > c.hash {
 				return errors.New("EXCLUSIONS: not sorted")
 			}
 			continue
@@ -335,14 +382,21 @@ func validateExclusions(body []string) error {
 }
 
 type verdictRecord struct {
-	cid          string
-	issuerKey    string
-	claimType    string
-	trusted      bool
-	revoked      bool
-	trustRoles   []string
-	excluded     string
-	lineJoinRole string
+	cid                string
+	inputHash          string
+	attestedSubjectCID string
+	issuerKey          string
+	claimType          string
+	status             string
+	trusted            bool
+	revoked            bool
+	revokedBy          []string
+	trustRoles         []string
+	reasons            []string
+	excluded           string
+	lineJoinRole       string
+	lineJoinReasons    string
+	lineJoinRevokedBy  string
 }
 
 func parseBoolLine(line, key string) (bool, error) {
@@ -368,15 +422,49 @@ func validateVerdicts(body []string) error {
 	var recs []verdictRecord
 	i := 0
 	for i < len(body) {
-		if !strings.HasPrefix(body[i], "Attestation-CID: ") {
-			return errors.New("VERDICTS: each record must start with Attestation-CID")
+		if !(strings.HasPrefix(body[i], "Attestation-CID: ") || strings.HasPrefix(body[i], "Input-Hash: ")) {
+			return errors.New("VERDICTS: each record must start with Attestation-CID or Input-Hash")
 		}
-		_, cid, err := validateKVLine(body[i])
-		if err != nil {
-			return fmt.Errorf("VERDICTS: %w", err)
+		vr := verdictRecord{}
+		for i < len(body) {
+			if strings.HasPrefix(body[i], "Attestation-CID: ") {
+				if vr.cid != "" {
+					return errors.New("VERDICTS: duplicate Attestation-CID")
+				}
+				_, cid, err := validateKVLine(body[i])
+				if err != nil {
+					return fmt.Errorf("VERDICTS: %w", err)
+				}
+				vr.cid = cid
+				i++
+				continue
+			}
+			if strings.HasPrefix(body[i], "Input-Hash: ") {
+				if vr.inputHash != "" {
+					return errors.New("VERDICTS: duplicate Input-Hash")
+				}
+				_, h, err := validateKVLine(body[i])
+				if err != nil {
+					return fmt.Errorf("VERDICTS: %w", err)
+				}
+				vr.inputHash = h
+				i++
+				continue
+			}
+			break
 		}
-		vr := verdictRecord{cid: cid}
-		i++
+		if vr.cid == "" && vr.inputHash == "" {
+			return errors.New("VERDICTS: missing Attestation-CID/Input-Hash")
+		}
+
+		if i < len(body) && strings.HasPrefix(body[i], "Attested-Subject-CID: ") {
+			_, v, err := validateKVLine(body[i])
+			if err != nil {
+				return fmt.Errorf("VERDICTS: %w", err)
+			}
+			vr.attestedSubjectCID = v
+			i++
+		}
 
 		if i < len(body) && strings.HasPrefix(body[i], "Issuer-Key: ") {
 			_, v, err := validateKVLine(body[i])
@@ -392,6 +480,14 @@ func validateVerdicts(body []string) error {
 				return fmt.Errorf("VERDICTS: %w", err)
 			}
 			vr.claimType = v
+			i++
+		}
+		if i < len(body) && strings.HasPrefix(body[i], "Status: ") {
+			_, v, err := validateKVLine(body[i])
+			if err != nil {
+				return fmt.Errorf("VERDICTS: %w", err)
+			}
+			vr.status = v
 			i++
 		}
 
@@ -415,6 +511,20 @@ func validateVerdicts(body []string) error {
 		vr.revoked = revoked
 		i++
 
+		for i < len(body) && strings.HasPrefix(body[i], "Revoked-By: ") {
+			_, v, err := validateKVLine(body[i])
+			if err != nil {
+				return fmt.Errorf("VERDICTS: %w", err)
+			}
+			vr.revokedBy = append(vr.revokedBy, v)
+			i++
+		}
+		for j := 1; j < len(vr.revokedBy); j++ {
+			if vr.revokedBy[j-1] > vr.revokedBy[j] {
+				return errors.New("VERDICTS: Revoked-By not sorted")
+			}
+		}
+
 		for i < len(body) && strings.HasPrefix(body[i], "Trust-Role: ") {
 			_, v, err := validateKVLine(body[i])
 			if err != nil {
@@ -429,6 +539,20 @@ func validateVerdicts(body []string) error {
 			}
 		}
 
+		for i < len(body) && strings.HasPrefix(body[i], "Reason: ") {
+			_, v, err := validateKVLine(body[i])
+			if err != nil {
+				return fmt.Errorf("VERDICTS: %w", err)
+			}
+			vr.reasons = append(vr.reasons, v)
+			i++
+		}
+		for j := 1; j < len(vr.reasons); j++ {
+			if vr.reasons[j-1] > vr.reasons[j] {
+				return errors.New("VERDICTS: Reason not sorted")
+			}
+		}
+
 		if i < len(body) && strings.HasPrefix(body[i], "Excluded-Reason: ") {
 			_, v, err := validateKVLine(body[i])
 			if err != nil {
@@ -439,6 +563,8 @@ func validateVerdicts(body []string) error {
 		}
 
 		vr.lineJoinRole = strings.Join(vr.trustRoles, ",")
+		vr.lineJoinReasons = strings.Join(vr.reasons, ",")
+		vr.lineJoinRevokedBy = strings.Join(vr.revokedBy, ",")
 		recs = append(recs, vr)
 	}
 
@@ -454,6 +580,9 @@ func verdictLess(a, b verdictRecord) bool {
 	if a.cid != b.cid {
 		return a.cid < b.cid
 	}
+	if a.inputHash != b.inputHash {
+		return a.inputHash < b.inputHash
+	}
 	if a.excluded != b.excluded {
 		return a.excluded < b.excluded
 	}
@@ -463,13 +592,25 @@ func verdictLess(a, b verdictRecord) bool {
 	if a.claimType != b.claimType {
 		return a.claimType < b.claimType
 	}
+	if a.attestedSubjectCID != b.attestedSubjectCID {
+		return a.attestedSubjectCID < b.attestedSubjectCID
+	}
+	if a.status != b.status {
+		return a.status < b.status
+	}
 	if a.trusted != b.trusted {
 		return a.trusted && !b.trusted
 	}
 	if a.revoked != b.revoked {
 		return !a.revoked && b.revoked
 	}
-	return a.lineJoinRole < b.lineJoinRole
+	if a.lineJoinRole != b.lineJoinRole {
+		return a.lineJoinRole < b.lineJoinRole
+	}
+	if a.lineJoinReasons != b.lineJoinReasons {
+		return a.lineJoinReasons < b.lineJoinReasons
+	}
+	return a.lineJoinRevokedBy < b.lineJoinRevokedBy
 }
 
 func validateCrypto(body []string) error {

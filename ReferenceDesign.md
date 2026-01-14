@@ -1382,12 +1382,15 @@ INPUTS
 Trust-Policy-CID: bafybeipolicy...
 Attestation-CID: bafybeiatta1...
 Attestation-CID: bafybeiatta2...
+Input-Hash: sha256:0123abcd...
 ```
 
 Rules:
 
-* All input attestations MUST be listed
-* Ordering MUST be lexicographic by CID
+* All resolver inputs MUST be listed.
+* Valid CATF inputs MUST be represented as `Attestation-CID: <cid>`.
+* Invalid/non-CATF inputs (no CATF CID) MUST be represented as `Input-Hash: sha256:<hex>`.
+* Canonical ordering is: all `Attestation-CID` lines first (lexicographically sorted), then all `Input-Hash` lines (lexicographically sorted).
 
 ---
 
@@ -1447,9 +1450,16 @@ Lists attestations excluded from trust.
 EXCLUSIONS
 Attestation-CID: bafybeibad...
 Reason: Signature invalid
+
+Input-Hash: sha256:0123abcd...
+Reason: CATF parse/canonicalization failed
 ```
 
 Reasons MUST be explicit and textual.
+
+Notes:
+
+* When an excluded input has no CATF CID, `Attestation-CID` is omitted and `Input-Hash` is used to preserve a deterministic identifier.
 
 ---
 
@@ -1466,21 +1476,35 @@ VERDICTS
 Attestation-CID: bafybeiatta1...
 Issuer-Key: ed25519:BASE64...
 Claim-Type: authorship
+Status: Trusted
 Trusted: true
 Revoked: false
 Trust-Role: author
+Reason: satisfied policy quorum
 
-Attestation-CID: bafybeibad...
+Input-Hash: sha256:0123abcd...
+Status: Invalid
 Trusted: false
 Revoked: false
+Reason: CATF parse/canonicalization failed
+
+Attestation-CID: bafybeibad...
+Status: Excluded
+Trusted: false
+Revoked: false
+Reason: signature invalid
 Excluded-Reason: signature invalid
 ```
 
 Rules:
 
-* If present, `Attestation-CID` identifies the attestation being described.
+* Each verdict record MUST be associated with either an `Attestation-CID` (valid CATF input) or an `Input-Hash` (invalid/non-CATF input).
 * `Trusted` and `Revoked` MUST be explicit (`true`/`false`).
-* `Excluded-Reason` is optional; if present it MUST be human-readable text.
+* `Status` is optional; if present it MUST be one of: `Trusted`, `Excluded`, `Revoked`, `Invalid`.
+* `Reason` MAY appear multiple times; if present, reasons MUST be human-readable text.
+* `Excluded-Reason` is optional legacy text; if present it MUST be human-readable.
+* `Revoked-By` MAY appear multiple times and identifies revocation attestations by CID.
+* `Trust-Role` MAY appear multiple times and identifies the roles this input satisfied.
 
 ---
 

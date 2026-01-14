@@ -101,7 +101,7 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 			}
 			sort.Strings(v.TrustRoles)
 		} else {
-			v.Status = VerdictUntrusted
+			v.Status = VerdictExcluded
 			v.ExcludedReason = "Issuer not trusted"
 			v.Reasons = []string{v.ExcludedReason}
 			exclusions = append(exclusions, Exclusion{CID: cid, Reason: v.ExcludedReason})
