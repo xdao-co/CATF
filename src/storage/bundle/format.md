@@ -1,6 +1,6 @@
 # CATF Bundle Format (Draft)
 
-**Status:** Draft specification (no implementation yet)
+**Status:** Draft specification (implementation exists in `src/storage/bundle`)
 
 ## 1) Purpose
 
@@ -146,6 +146,10 @@ Import MUST fail (hard) on:
 - CID mismatch
 - Duplicate paths with different bytes
 - Invalid CID strings
+
+Import SHOULD fail-closed on unknown TAR entries by default.
+An implementation MAY provide an explicit "ignore unknown" option for forwards compatibility,
+but it MUST still reject path traversal attempts.
 
 ## 7) Security considerations
 

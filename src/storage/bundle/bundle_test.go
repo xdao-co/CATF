@@ -138,7 +138,7 @@ func TestBundle_ImportRejectsDuplicateBlockEntry(t *testing.T) {
 	}
 }
 
-func TestBundle_ImportIgnoresUnknownAndTraversalEntries(t *testing.T) {
+func TestBundle_ImportFailsClosedOnUnknownEntry(t *testing.T) {
 	payload := []byte("ok")
 	id, err := cidutil.CIDv1RawSHA256CID(payload)
 	if err != nil {
@@ -146,7 +146,6 @@ func TestBundle_ImportIgnoresUnknownAndTraversalEntries(t *testing.T) {
 	}
 
 	b := makeDeterministicTarEntries(t, []tarEntry{
-		{name: "../evil", content: []byte("nope")},
 		{name: "index.json", content: []byte("{}\n")},
 		{name: "random.txt", content: []byte("ignore")},
 		{name: "blocks/" + id.String(), content: payload},
@@ -158,7 +157,35 @@ func TestBundle_ImportIgnoresUnknownAndTraversalEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bundle.Import(bytes.NewReader(b), dst); err != nil {
+	err = bundle.Import(bytes.NewReader(b), dst)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "unknown entry") {
+		t.Fatalf("expected unknown entry error, got %v", err)
+	}
+}
+
+func TestBundle_ImportAllowsUnknownEntriesWhenOptionSet(t *testing.T) {
+	payload := []byte("ok")
+	id, err := cidutil.CIDv1RawSHA256CID(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	b := makeDeterministicTarEntries(t, []tarEntry{
+		{name: "index.json", content: []byte("{}\n")},
+		{name: "random.txt", content: []byte("ignore")},
+		{name: "blocks/" + id.String(), content: payload},
+	})
+
+	dstDir := t.TempDir()
+	dst, err := localfs.New(dstDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{IgnoreUnknown: true}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,6 +195,24 @@ func TestBundle_ImportIgnoresUnknownAndTraversalEntries(t *testing.T) {
 	}
 	if !bytes.Equal(got, payload) {
 		t.Fatalf("payload mismatch")
+	}
+}
+
+func TestBundle_ImportRejectsTraversalPath(t *testing.T) {
+	b := makeDeterministicTarEntries(t, []tarEntry{{name: "../evil", content: []byte("nope")}})
+
+	dstDir := t.TempDir()
+	dst, err := localfs.New(dstDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{IgnoreUnknown: true})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "invalid entry path") {
+		t.Fatalf("expected invalid entry path error, got %v", err)
 	}
 }
 

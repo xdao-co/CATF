@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path"
 	"sort"
 	"strings"
 
@@ -124,10 +123,26 @@ func Export(w io.Writer, cas storage.CAS, ids []cid.Cid, opts ExportOptions) err
 	return tw.Close()
 }
 
+// ImportOptions controls bundle import behavior.
+type ImportOptions struct {
+	// IgnoreUnknown controls whether unknown TAR entries are ignored.
+	//
+	// Default (false) is fail-closed: unknown entries cause Import to return an error.
+	IgnoreUnknown bool
+}
+
 // Import reads a bundle from r and imports all blocks into cas.
 //
-// It validates that each block's bytes match both the filename CID and the computed CID.
+// Default behavior is fail-closed: unknown entries cause an error.
+// Use ImportWithOptions to allow ignoring unknown entries.
 func Import(r io.Reader, cas storage.CAS) error {
+	return ImportWithOptions(r, cas, ImportOptions{})
+}
+
+// ImportWithOptions reads a bundle from r and imports all blocks into cas.
+//
+// It validates that each block's bytes match both the filename CID and the computed CID.
+func ImportWithOptions(r io.Reader, cas storage.CAS, opts ImportOptions) error {
 	if cas == nil {
 		return fmt.Errorf("bundle: nil CAS")
 	}
@@ -143,14 +158,16 @@ func Import(r io.Reader, cas storage.CAS) error {
 		if err != nil {
 			return err
 		}
-		if h.Typeflag != tar.TypeReg {
-			continue
-		}
-
 		name := cleanTarPath(h.Name)
 		if name == "" {
-			_, _ = io.Copy(io.Discard, tr)
-			continue
+			return fmt.Errorf("bundle: invalid entry path: %q", h.Name)
+		}
+
+		if h.Typeflag != tar.TypeReg {
+			if opts.IgnoreUnknown {
+				continue
+			}
+			return fmt.Errorf("bundle: unexpected tar entry type: %v (%s)", h.Typeflag, name)
 		}
 
 		// Non-authoritative metadata.
@@ -160,9 +177,11 @@ func Import(r io.Reader, cas storage.CAS) error {
 		}
 
 		if !strings.HasPrefix(name, "blocks/") {
-			// For forwards compatibility, ignore unknown files.
-			_, _ = io.Copy(io.Discard, tr)
-			continue
+			if opts.IgnoreUnknown {
+				_, _ = io.Copy(io.Discard, tr)
+				continue
+			}
+			return fmt.Errorf("bundle: unknown entry: %s", name)
 		}
 
 		cidStr := strings.TrimPrefix(name, "blocks/")
@@ -249,14 +268,21 @@ func cleanTarPath(name string) string {
 	name = strings.TrimSpace(name)
 	name = strings.ReplaceAll(name, "\\", "/")
 	name = strings.TrimPrefix(name, "./")
+	name = strings.TrimPrefix(name, "/")
+	if name == "" {
+		return ""
+	}
 
-	p := path.Clean("/" + name)
-	p = strings.TrimPrefix(p, "/")
-	if p == "." || p == "" {
-		return ""
+	parts := strings.Split(name, "/")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part == "" || part == "." {
+			return ""
+		}
+		if part == ".." {
+			return ""
+		}
+		out = append(out, part)
 	}
-	if strings.HasPrefix(p, "../") || p == ".." {
-		return ""
-	}
-	return p
+	return strings.Join(out, "/")
 }
