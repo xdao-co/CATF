@@ -1,0 +1,56 @@
+-----BEGIN XDAO RESOLUTION-----
+META
+Resolver-ID: xdao-resolver-reference
+Spec: xdao-crof-1
+Version: 1
+
+INPUTS
+Trust-Policy-CID: bafkreicwrf5igjc3glyxk2atsztnc4zqj3auxnncandsgfvrrmckplqu5e
+Attestation-CID: bafkreibmoh7qsv23k3xjcwcagkxmt7mzaiwdyinf3i3gw6vpwgyzshgyy4
+Attestation-CID: bafkreifg2qkhvt6s3ditu2fl2vsknlzjz4mwb7cgi6ykemcrc6igh7276i
+
+RESULT
+Confidence: Medium
+Policy-Issuer-Key: Type=authorship; Role=author; Issuer-Key=ed25519:Zej5sLxurhJBafBXb5c2LSlajPX3cLReFDV85kfTPuw=
+Policy-Issuer-Key: Type=authorship; Role=author; Issuer-Key=ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Policy-Verdict-Reason: Type=authorship; Role=author; Reason=Satisfied
+Policy-Verdict: Type=authorship; Role=author; Quorum=1; Observed=2; Satisfied=true
+State: Forked
+Subject-CID: bafy-fork-1
+
+PATHS
+Path-ID: path-1
+Attestation-CID: bafkreibmoh7qsv23k3xjcwcagkxmt7mzaiwdyinf3i3gw6vpwgyzshgyy4
+Path-ID: path-2
+Attestation-CID: bafkreifg2qkhvt6s3ditu2fl2vsknlzjz4mwb7cgi6ykemcrc6igh7276i
+
+FORKS
+Fork-ID: fork-1
+Conflicting-Path: path-1
+Conflicting-Path: path-2
+
+EXCLUSIONS
+
+VERDICTS
+Attestation-CID: bafkreibmoh7qsv23k3xjcwcagkxmt7mzaiwdyinf3i3gw6vpwgyzshgyy4
+Attested-Subject-CID: bafy-fork-1
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Claim-Type: authorship
+Status: Trusted
+Trusted: true
+Revoked: false
+Trust-Role: author
+Reason: Issuer trusted by policy
+Attestation-CID: bafkreifg2qkhvt6s3ditu2fl2vsknlzjz4mwb7cgi6ykemcrc6igh7276i
+Attested-Subject-CID: bafy-fork-1
+Issuer-Key: ed25519:Zej5sLxurhJBafBXb5c2LSlajPX3cLReFDV85kfTPuw=
+Claim-Type: authorship
+Status: Trusted
+Trusted: true
+Revoked: false
+Trust-Role: author
+Reason: Issuer trusted by policy
+
+CRYPTO
+
+-----END XDAO RESOLUTION-----

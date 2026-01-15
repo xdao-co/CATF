@@ -1,0 +1,40 @@
+-----BEGIN XDAO RESOLUTION-----
+META
+Resolver-ID: xdao-resolver-reference
+Spec: xdao-crof-1
+Version: 1
+
+INPUTS
+Trust-Policy-CID: bafkreifg3qecqij2nwml45irlaylr7evysro57ovobp6bmt4k7vx64xfwa
+Attestation-CID: bafkreid6mf2etk47plqok6uvtk6wrsxtohon6bgj6vxvbjsvgg65lqajtu
+
+RESULT
+Confidence: High
+Policy-Issuer-Key: Type=authorship; Role=author; Issuer-Key=ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Policy-Verdict-Reason: Type=authorship; Role=author; Reason=Satisfied
+Policy-Verdict: Type=authorship; Role=author; Quorum=1; Observed=1; Satisfied=true
+State: Resolved
+Subject-CID: bafy-resolver-1
+
+PATHS
+Path-ID: path-1
+Attestation-CID: bafkreid6mf2etk47plqok6uvtk6wrsxtohon6bgj6vxvbjsvgg65lqajtu
+
+FORKS
+
+EXCLUSIONS
+
+VERDICTS
+Attestation-CID: bafkreid6mf2etk47plqok6uvtk6wrsxtohon6bgj6vxvbjsvgg65lqajtu
+Attested-Subject-CID: bafy-resolver-1
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Claim-Type: authorship
+Status: Trusted
+Trusted: true
+Revoked: false
+Trust-Role: author
+Reason: Issuer trusted by policy
+
+CRYPTO
+
+-----END XDAO RESOLUTION-----

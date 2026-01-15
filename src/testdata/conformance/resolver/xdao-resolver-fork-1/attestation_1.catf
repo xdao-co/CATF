@@ -1,0 +1,19 @@
+-----BEGIN XDAO ATTESTATION-----
+META
+Spec: xdao-catf-1
+Version: 1
+
+SUBJECT
+CID: bafy-fork-1
+Description: Fork conformance
+
+CLAIMS
+Role: author
+Type: authorship
+
+CRYPTO
+Hash-Alg: sha256
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Signature: a4mUEBRQQ4kUULnTC0nvLZUxDPiV2rPiUVM5bFXdKcwW+20OZ7HyaAoizi+AUK1jduMXXcfnW9wOf1ZL7DKqDw==
+Signature-Alg: ed25519
+-----END XDAO ATTESTATION-----

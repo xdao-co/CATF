@@ -1,0 +1,19 @@
+-----BEGIN XDAO ATTESTATION-----
+META
+Spec: xdao-catf-1
+Version: 1
+
+SUBJECT
+CID: bafy-resolver-1
+Description: Resolver conformance
+
+CLAIMS
+Role: author
+Type: authorship
+
+CRYPTO
+Hash-Alg: sha256
+Issuer-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Signature: hxIixMlRXoMKIUsrc2knTNMSRYoKlukMJngghZU88BmvNGEMmttBd1iBJsliCg/MbjPbMRoZ+Rj1qU9pKPqYDg==
+Signature-Alg: ed25519
+-----END XDAO ATTESTATION-----

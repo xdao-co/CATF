@@ -1,0 +1,20 @@
+-----BEGIN XDAO ATTESTATION-----
+META
+Spec: xdao-catf-1
+Version: 1
+
+SUBJECT
+CID: bafy-supersedes-1
+Description: Supersedes conformance
+
+CLAIMS
+Role: author
+Supersedes: bafkreigux5hiooilgd6uop7324rqv2ei6ck2yljuzbuch2jcgi5dhtwi5u
+Type: supersedes
+
+CRYPTO
+Hash-Alg: sha256
+Issuer-Key: ed25519:RyG1tjInLmWmjdp6wltBhfiwGRbbGFwUKH25Lit3D64=
+Signature: Cqyqnl4map5IJoitiYdTw5gFC4Re2rwovdGIp5H+vRp+PDfskvIx3IpK0O9M9avJ1yVX/CoIAQANWN63g8wOAw==
+Signature-Alg: ed25519
+-----END XDAO ATTESTATION-----
