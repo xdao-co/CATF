@@ -137,6 +137,11 @@ A platform for decentralized coordination based on evidence, policy, and determi
 - Resolver evidence for invalid inputs: when an input attestation fails CATF parse/canonicalization, the resolver surfaces it deterministically as an exclusion/verdict with an empty `CID`, an `InputHash` of the form `sha256:<hex>`, and reason `CATF parse/canonicalization failed`.
 - CROF rendering of invalid/unknown inputs: CROF omits `Attestation-CID: ...` lines when the CID is empty, but still renders `Input-Hash: sha256:<hex>` (when available) plus `Reason:` / `Excluded-Reason:`.
 
+Go integration note:
+
+- Prefer signing helpers from `xdao.co/catf/keys` (`keys.SignEd25519SHA256`, `keys.SignDilithium3`) over the deprecated `catf.Sign*` wrappers.
+- The recommended attestation signing flow is documented in [Integration.md](Integration.md#go-integration-recommended-for-applications).
+
 ## Documentation sync policy
 
 When changing behavior or formats in the reference implementation:
