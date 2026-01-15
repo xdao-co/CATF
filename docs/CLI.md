@@ -25,6 +25,22 @@ cd ./src
 go run ./cmd/xdao-catf --help
 ```
 
+## End-to-end demonstration (recommended)
+
+If your goal is to demonstrate the entire lifecycle (subject → attestations → policy → resolve → CROF) **and** store all artifacts in a content-addressable store, use the walkthrough Makefile targets:
+
+```sh
+make walkthrough-localfs
+```
+
+Optional (requires Kubo `ipfs` on PATH):
+
+```sh
+make walkthrough-ipfs
+```
+
+Details: `docs/Walkthrough_Storage.md`.
+
 ## Commands
 
 ### `crof`

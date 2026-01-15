@@ -1,5 +1,10 @@
 xDAO CLI Use Cases – End-to-End Workflows
 
+Runnable demos:
+
+- For scripts you can run immediately, see `docs/examples/README.md`.
+- For a full storage walkthrough that stores subject/policy/attestations/CROF in a CAS (localfs + optional IPFS), see `docs/Walkthrough_Storage.md`.
+
 Note on Keys: These use cases assume no external PKI or wallet. xDAO provides a minimal, local Key Management Subsystem (KMS-lite) to generate, store, derive, and rotate keys deterministically for users who do not already have a mechanism.
 
 All key material is local-first, offline-capable, and never requires a network.

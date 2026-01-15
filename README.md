@@ -9,6 +9,7 @@
 - Integration guide: [docs/Integration.md](docs/Integration.md)
 - Flux integration: [docs/FluxIntegration.md](docs/FluxIntegration.md)
 - End-to-end workflows: [docs/UseCases.md](docs/UseCases.md)
+- Full process walkthrough (store everything in CAS): [docs/Walkthrough_Storage.md](docs/Walkthrough_Storage.md)
 - Runnable scripts: [docs/examples/README.md](docs/examples/README.md)
 
 ## Glossary
