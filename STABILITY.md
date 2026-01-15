@@ -121,6 +121,15 @@ Internal APIs are not for external consumption and may change at any time.
     These symbols are exported for reference implementation composition and tests, but are not part of
     the stable protocol-facing library surface.
 
+## Deprecations
+
+Deprecated symbols remain available for compatibility, but are not recommended for new integrations.
+
+- Package `xdao.co/catf/catf`
+  - `SignEd25519SHA256` → use `xdao.co/catf/keys.SignEd25519SHA256`
+  - `SignDilithium3` → use `xdao.co/catf/keys.SignDilithium3`
+  - `GenerateDilithium3Keypair` → use `xdao.co/catf/keys.GenerateDilithium3Keypair`
+
 ## Required Processing Pipeline
 
 Consumers SHOULD treat CATF processing as a strict, explicit pipeline:
