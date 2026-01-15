@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -33,6 +34,7 @@ import (
 type CAS struct {
 	bin string
 	env []string
+	pin bool
 }
 
 type Options struct {
@@ -41,6 +43,9 @@ type Options struct {
 	// Env optionally overrides the command environment (e.g. to set IPFS_PATH).
 	// If nil, the process environment is used.
 	Env []string
+	// Pin controls whether written blocks are pinned in the local IPFS repo.
+	// If nil, the default is true.
+	Pin *bool
 }
 
 func New(opts Options) *CAS {
@@ -48,7 +53,11 @@ func New(opts Options) *CAS {
 	if bin == "" {
 		bin = "ipfs"
 	}
-	return &CAS{bin: bin, env: opts.Env}
+	pin := true
+	if opts.Pin != nil {
+		pin = *opts.Pin
+	}
+	return &CAS{bin: bin, env: opts.Env, pin: pin}
 }
 
 func (c *CAS) Put(data []byte) (cid.Cid, error) {
@@ -60,21 +69,60 @@ func (c *CAS) Put(data []byte) (cid.Cid, error) {
 		return cid.Undef, storage.ErrInvalidCID
 	}
 
-	// Store as a raw block with explicit parameters so the CID matches the CATF/CROF CID contract.
-	out, err := c.run(data,
-		"block", "put",
-		"--quiet",
-		"--format=raw",
-		"--mhtype=sha2-256",
-		"--mhlen=32",
-		"--cid-version=1",
-		"/dev/stdin",
-	)
+	// Store as a raw block so the returned CID matches the CATF/CROF CID contract.
+	// Different Kubo versions use different flag names; try a couple.
+	//
+	// We intentionally write via a temp file rather than /dev/stdin so this works
+	// across platforms (including Windows builds).
+	f, err := os.CreateTemp("", "xdao-catf-ipfs-*")
 	if err != nil {
 		return cid.Undef, err
 	}
+	path := f.Name()
+	if _, werr := f.Write(data); werr != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return cid.Undef, werr
+	}
+	if cerr := f.Close(); cerr != nil {
+		_ = os.Remove(path)
+		return cid.Undef, cerr
+	}
+	defer os.Remove(path)
 
-	got, err := cid.Decode(strings.TrimSpace(string(out)))
+	base := []string{"block", "put", "--quiet"}
+	if c.pin {
+		base = append(base, "--pin")
+	}
+	variants := [][]string{
+		append(append([]string{}, base...), "--cid-codec=raw", "--mhtype=sha2-256", "--mhlen=32", path),
+		append(append([]string{}, base...), "--format=raw", "--mhtype=sha2-256", "--mhlen=32", path),
+		append(append([]string{}, base...), "--cid-version=1", "--format=raw", "--mhtype=sha2-256", "--mhlen=32", path),
+	}
+
+	var lastErr error
+	var stdout string
+	for _, argv := range variants {
+		out, runErr := c.run(nil, argv...)
+		if runErr != nil {
+			lastErr = runErr
+			continue
+		}
+		stdout = strings.TrimSpace(string(out))
+		fields := strings.Fields(stdout)
+		if len(fields) == 0 {
+			lastErr = fmt.Errorf("ipfs: block put returned empty output")
+			continue
+		}
+		stdout = fields[0]
+		lastErr = nil
+		break
+	}
+	if lastErr != nil {
+		return cid.Undef, lastErr
+	}
+
+	got, err := cid.Decode(stdout)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("ipfs: unexpected block put output: %w", err)
 	}
@@ -131,11 +179,11 @@ func (c *CAS) run(stdin []byte, args ...string) ([]byte, error) {
 
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {
-		s := strings.TrimSpace(string(ee.Stderr))
-		if s == "" {
+		msg := strings.TrimSpace(string(ee.Stderr))
+		if msg == "" {
 			return nil, fmt.Errorf("ipfs: %v", err)
 		}
-		return nil, fmt.Errorf("ipfs: %s", s)
+		return nil, fmt.Errorf("ipfs: %s", msg)
 	}
 	return nil, err
 }
