@@ -5,9 +5,19 @@ on:
         tags:
             - "v*"
     workflow_dispatch:
+        inputs:
+            tag:
+                description: "Existing git tag to release (e.g. v1.2.3)"
+                required: true
+                type: string
 
 permissions:
     contents: write
+
+env:
+    # On tag pushes, github.ref_name is the tag.
+    # On workflow_dispatch, inputs.tag is required.
+    RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
     test:
@@ -17,6 +27,8 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+              with:
+                  ref: ${{ env.RELEASE_TAG }}
 
             - name: Set up Go
               uses: actions/setup-go@v5
@@ -60,6 +72,8 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+              with:
+                  ref: ${{ env.RELEASE_TAG }}
 
             - name: Set up Go
               uses: actions/setup-go@v5
@@ -76,7 +90,7 @@ jobs:
                   set -euo pipefail
                   mkdir -p dist
 
-                  out="dist/xdao-catf_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}${{ matrix.ext }}"
+                  out="dist/xdao-catf_${RELEASE_TAG}_${GOOS}_${GOARCH}${{ matrix.ext }}"
                   go -C src build -trimpath -ldflags='-s -w' -o "../${out}" ./cmd/xdao-catf
 
                   # Smoke check (skip on Windows cross-build)
@@ -85,19 +99,18 @@ jobs:
                   fi
 
                   # Package
-                  base="xdao-catf_${GITHUB_REF_NAME}_${GOOS}_${GOARCH}"
+                  base="xdao-catf_${RELEASE_TAG}_${GOOS}_${GOARCH}"
                   if [[ "${{ matrix.archive_ext }}" == "zip" ]]; then
                     (cd dist && zip -q "${base}.zip" "${base}${{ matrix.ext }}")
-                    rm -f "${out}"
                   else
                     (cd dist && tar -czf "${base}.tar.gz" "${base}${{ matrix.ext }}")
-                    rm -f "${out}"
                   fi
+                  rm -f "${out}"
 
             - name: Upload artifacts
               uses: actions/upload-artifact@v4
               with:
-                  name: xdao-catf-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
+                  name: xdao-catf-${{ env.RELEASE_TAG }}-${{ matrix.goos }}-${{ matrix.goarch }}
                   path: dist/*
                   if-no-files-found: error
 
@@ -112,20 +125,30 @@ jobs:
               with:
                   path: dist
 
-            - name: Build checksums
+            - name: Prepare release assets
+              shell: bash
               run: |
                   set -euo pipefail
                   # Flatten all artifact folders into ./dist
-                  find dist -type f -maxdepth 2 -print0 | xargs -0 -I{} mv {} dist/ || true
-                  find dist -type d -empty -delete || true
+                  find dist -maxdepth 2 -mindepth 2 -type f -print0 | xargs -0 -I{} mv {} dist/ || true
+                  find dist -mindepth 1 -type d -empty -delete || true
 
                   cd dist
-                  shasum -a 256 * > SHA256SUMS
+                  shopt -s nullglob
+                  files=( *.tar.gz *.zip )
+                  if (( ${#files[@]} == 0 )); then
+                    echo "error: no release archives found" >&2
+                    ls -la >&2
+                    exit 1
+                  fi
+                  shasum -a 256 "${files[@]}" > SHA256SUMS
 
             - name: Create release
               uses: softprops/action-gh-release@v2
               with:
-                  tag_name: ${{ github.ref_name }}
+                  tag_name: ${{ env.RELEASE_TAG }}
                   generate_release_notes: true
                   files: |
-                      dist/*
+                      dist/*.tar.gz
+                      dist/*.zip
+                      dist/SHA256SUMS
