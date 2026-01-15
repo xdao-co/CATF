@@ -304,3 +304,116 @@ func TestCanonicalizeCROF_RejectsVerdictsRecordNotStartingWithCIDOrHash(t *testi
 		t.Fatalf("expected CanonicalizeCROF error")
 	}
 }
+
+func TestCanonicalizeCROF_RejectsPathsNotStartingWithPathID(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Paths: []resolver.Path{
+			{ID: "path-a", CIDs: []string{"bafy-a1"}},
+		},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text, "Path-ID: path-a\n", "Attestation-CID: bafy-a1\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsUnsortedPathIDs(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Paths: []resolver.Path{
+			{ID: "path-a", CIDs: []string{"bafy-a1"}},
+			{ID: "path-b", CIDs: []string{"bafy-a2"}},
+		},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1", "bafy-a2"}, RenderOptions{})
+
+	text := string(b)
+	// Make the second ID lexicographically smaller than the first.
+	bad := []byte(strings.Replace(text, "Path-ID: path-b\n", "Path-ID: path-0\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsForksNotStartingWithForkID(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Forks: []resolver.Fork{
+			{ID: "fork-a", ConflictingPath: []string{"path-a"}},
+		},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text, "Fork-ID: fork-a\n", "Conflicting-Path: path-a\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsUnsortedForkIDs(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Forks: []resolver.Fork{
+			{ID: "fork-a", ConflictingPath: []string{"path-a"}},
+			{ID: "fork-b", ConflictingPath: []string{"path-b"}},
+		},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	// Make the second ID lexicographically smaller than the first.
+	bad := []byte(strings.Replace(text, "Fork-ID: fork-b\n", "Fork-ID: fork-0\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsUnsortedConflictingPaths(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Forks: []resolver.Fork{
+			{ID: "fork-a", ConflictingPath: []string{"path-a", "path-b"}},
+		},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text,
+		"Conflicting-Path: path-a\nConflicting-Path: path-b\n",
+		"Conflicting-Path: path-b\nConflicting-Path: path-a\n",
+		1,
+	))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
