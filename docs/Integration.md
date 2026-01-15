@@ -24,6 +24,17 @@ Resolution is deterministic:
 - Inputs: `policy bytes` + `attestation bytes[]` + `subject CID`
 - Output: CROF resolution state + paths/forks/exclusions
 
+### Go integration: single result type
+
+If you want a compact, Go-friendly output type for resolution results (instead of the full JSON DTO), use:
+
+- `model.ResolveResult(...)` → returns `model.ResolutionResult`
+
+`ResolutionResult` includes:
+
+- `CROF` and `CROFCID`
+- policy verdicts (`Verdicts`), forks, and exclusions
+
 ---
 
 ## 1) Define your subject canonicalization (what exactly is hashed)

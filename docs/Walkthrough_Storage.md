@@ -98,6 +98,11 @@ They use:
 - `./bin/xdao-catf` to generate keys and attestations
 - `./bin/xdao-cascli` to put/get/resolve against a selected CAS backend
 
+Internally, `xdao-cascli` performs the “resolve from CIDs” step via the public Go API:
+
+- `model.ResolveAndRenderCROF(...)` (JSON-ish DTO)
+- `model.ResolveResult(...)` (compact Go type: `model.ResolutionResult`)
+
 ---
 
 ## Troubleshooting

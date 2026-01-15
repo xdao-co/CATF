@@ -18,26 +18,62 @@ type ResolveOptions struct {
 	CROFOptions crof.RenderOptions
 }
 
+// ResolveResult runs the resolver (hydrating by CID via CAS when needed) and returns a compact,
+// Go-friendly view of the outcome.
+func ResolveResult(req ResolverRequest, opts ResolveOptions) (*ResolutionResult, error) {
+	out, crofBytes, _, crofCID, err := resolveAndRender(req, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := fromResolution(out.Resolution)
+	return &ResolutionResult{
+		CROF:       crofBytes,
+		CROFCID:    crofCID,
+		Verdicts:   append([]PolicyVerdict(nil), res.PolicyVerdicts...),
+		Forks:      append([]Fork(nil), res.Forks...),
+		Exclusions: append([]Exclusion(nil), res.Exclusions...),
+	}, nil
+}
+
 // ResolveAndRenderCROF runs the resolver (hydrating by CID via CAS when needed) and renders
 // canonical CROF bytes bound to the inputs.
 func ResolveAndRenderCROF(req ResolverRequest, opts ResolveOptions) (*ResolverResponse, error) {
-	policyRef, err := toBlobRef(req.Policy)
+	out, crofBytes, crofCIDStr, _, err := resolveAndRender(req, opts)
 	if err != nil {
 		return nil, err
+	}
+
+	resp := &ResolverResponse{
+		Resolution:     fromResolution(out.Resolution),
+		TrustPolicyCID: out.TrustPolicyCID,
+		AttestationIDs: append([]string(nil), out.AttestationIDs...),
+		CROF: CROFDocument{
+			Bytes: crofBytes,
+			CID:   crofCIDStr,
+		},
+	}
+	return resp, nil
+}
+
+func resolveAndRender(req ResolverRequest, opts ResolveOptions) (*resolver.ResolveOutputCAS, []byte, string, cid.Cid, error) {
+	policyRef, err := toBlobRef(req.Policy)
+	if err != nil {
+		return nil, nil, "", cid.Undef, err
 	}
 
 	attRefs := make([]resolver.BlobRef, 0, len(req.Attestations))
 	for i, a := range req.Attestations {
 		ref, err := toBlobRef(a)
 		if err != nil {
-			return nil, NewError(ErrInvalidRequest, "invalid attestation["+itoa(i)+"]: "+err.Error())
+			return nil, nil, "", cid.Undef, NewError(ErrInvalidRequest, "invalid attestation["+itoa(i)+"]: "+err.Error())
 		}
 		attRefs = append(attRefs, ref)
 	}
 
 	mode, err := toCompliance(req.Compliance)
 	if err != nil {
-		return nil, err
+		return nil, nil, "", cid.Undef, err
 	}
 
 	out, err := resolver.ResolveWithCAS(resolver.ResolveRequestCAS{
@@ -49,24 +85,20 @@ func ResolveAndRenderCROF(req ResolverRequest, opts ResolveOptions) (*ResolverRe
 		CASAdapters:  opts.CASAdapters,
 	})
 	if err != nil {
-		return nil, mapErr(err)
+		return nil, nil, "", cid.Undef, mapErr(err)
 	}
 
-	crofBytes, crofCID, err := crof.RenderWithCID(out.Resolution, out.TrustPolicyCID, out.AttestationIDs, opts.CROFOptions)
+	crofBytes, crofCIDStr, err := crof.RenderWithCID(out.Resolution, out.TrustPolicyCID, out.AttestationIDs, opts.CROFOptions)
 	if err != nil {
-		return nil, mapErr(err)
+		return nil, nil, "", cid.Undef, mapErr(err)
 	}
 
-	resp := &ResolverResponse{
-		Resolution:     fromResolution(out.Resolution),
-		TrustPolicyCID: out.TrustPolicyCID,
-		AttestationIDs: append([]string(nil), out.AttestationIDs...),
-		CROF: CROFDocument{
-			Bytes: crofBytes,
-			CID:   crofCID,
-		},
+	crofCID, err := cid.Decode(crofCIDStr)
+	if err != nil {
+		return nil, nil, "", cid.Undef, NewError(ErrInvalidCID, "invalid crof cid")
 	}
-	return resp, nil
+
+	return out, crofBytes, crofCIDStr, crofCID, nil
 }
 
 func toBlobRef(b BlobRef) (resolver.BlobRef, error) {
