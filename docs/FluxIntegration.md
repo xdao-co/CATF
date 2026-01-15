@@ -55,7 +55,10 @@ Sketch:
 
 ```go
 local, _ := localfs.New("/var/lib/flux/cas")
-// transport := ipfs.New(ipfs.Options{}) // optional adapter
+// transport := ipfs.New(ipfs.Options{}) // optional adapter (defaults to pin=true)
+
+// To disable pinning:
+// transport := ipfs.New(ipfs.Options{Pin: ipfs.Bool(false)})
 
 cas := storage.MultiCAS{Adapters: []storage.CAS{local /*, transport */}}
 ```

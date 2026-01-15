@@ -195,3 +195,10 @@ func isLikelyNotFound(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "not found") || strings.Contains(msg, "block not found")
 }
+
+// Bool returns a pointer to v.
+//
+// This is a small convenience for configuring Options values like Pin.
+func Bool(v bool) *bool {
+	return &v
+}

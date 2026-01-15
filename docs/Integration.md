@@ -87,7 +87,10 @@ Adapter ordering is slice order (deterministic).
 
 ```go
 local, _ := localfs.New("/var/lib/xdao/cas")
-ipfsCAS := ipfs.New(ipfs.Options{}) // optional
+ipfsCAS := ipfs.New(ipfs.Options{}) // optional (defaults to pin=true)
+
+// To explicitly disable pinning:
+// ipfsCAS := ipfs.New(ipfs.Options{Pin: ipfs.Bool(false)})
 
 cas := storage.MultiCAS{Adapters: []storage.CAS{local, ipfsCAS}}
 ```
@@ -111,6 +114,11 @@ If you intend other peers to fetch the content, you need a network-facing node (
 - Install Kubo `ipfs`
 - Run the node in daemon mode: `ipfs daemon`
 - Ensure content is pinned/served by that node (or a pinning/service layer)
+
+Optional tests:
+
+- The `xdao.co/catf/storage/ipfs` adapter includes a conformance test that is skipped by default.
+- Run it locally with `XDAO_TEST_IPFS=1 go -C src test ./...` (requires `ipfs` on `PATH`).
 
 ---
 
