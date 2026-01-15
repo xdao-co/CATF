@@ -16,3 +16,12 @@ func CIDv1RawSHA256(data []byte) string {
 	}
 	return cid.NewCidV1(cid.Raw, sum).String()
 }
+
+// CIDv1RawSHA256CID returns an IPFS-compatible CIDv1 (raw + sha2-256) derived from data.
+func CIDv1RawSHA256CID(data []byte) (cid.Cid, error) {
+	sum, err := multihash.Sum(data, multihash.SHA2_256, -1)
+	if err != nil {
+		return cid.Undef, err
+	}
+	return cid.NewCidV1(cid.Raw, sum), nil
+}

@@ -28,3 +28,18 @@ func RenderWithCID(res *resolver.Resolution, trustPolicyCID string, attestationC
 	}
 	return b, cid, nil
 }
+
+// RenderSignedWithCID renders CROF with a required ed25519 signature and returns its CID.
+//
+// Unlike RenderWithCID, this fails explicitly if signing cannot be performed.
+func RenderSignedWithCID(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []string, opts RenderOptions) ([]byte, string, error) {
+	b, err := RenderSigned(res, trustPolicyCID, attestationCIDs, opts)
+	if err != nil {
+		return nil, "", err
+	}
+	cid, err := CID(b)
+	if err != nil {
+		return nil, "", err
+	}
+	return b, cid, nil
+}

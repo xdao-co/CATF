@@ -45,23 +45,36 @@ Use `doc-cid` to compute a stable CID for bytes:
 
 This only computes the CID; it does not store bytes anywhere.
 
-### Store bytes in local IPFS repo (no daemon required)
+### Storage & hydration (CAS is mandatory)
 
-If you want to also store bytes locally in your node’s IPFS repo:
+CATF integrations frequently pass around *CIDs* (for policies and attestations) rather than always moving bytes.
+When you do that, you MUST provide a **content-addressable store (CAS)** that can hydrate bytes by CID.
+
+The core library expresses this as a small interface (`xdao.co/catf/storage.CAS`) and ships an offline reference implementation:
+
+- Local filesystem CAS: `xdao.co/catf/storage/localfs`
+
+Design note:
+
+- Reachability is not validity. Whether bytes came from a database, filesystem, or IPFS transport, the bytes MUST be verified against the CID (hash mismatch must be treated as an error).
+
+### Optional: IPFS as a transport (not a requirement)
+
+IPFS is an optional transport/pinning layer for exchanging blocks with other peers. It is not required to use CATF.
+
+If you want to store bytes in a local IPFS repo (no daemon required):
 
 ```sh
 ./bin/xdao-catf ipfs put --init ./path/to/subject.bin
 ```
 
-This writes the raw block to the local IPFS repo (via `ipfs block put`) and prints the CID.
+This writes a raw block to the local IPFS repo (via `ipfs block put`) and prints the CID.
 
-### Publish to the IPFS network
-
-If you intend other peers to fetch the content, you need a network-facing node (or pinning layer). Concretely:
+If you intend other peers to fetch the content, you need a network-facing node (or pinning layer):
 
 - Install Kubo `ipfs`
 - Run the node in daemon mode: `ipfs daemon`
-- Ensure content is pinned/served by that node (or an XDAO Node service)
+- Ensure content is pinned/served by that node (or a pinning/service layer)
 
 ---
 
@@ -389,7 +402,7 @@ An external project usually needs to ship:
 - A **subject canonicalization rule** (what bytes are hashed/published)
 - A **key strategy** (KMS-lite for pilots, or existing signer infrastructure)
 - A **storage layer** for:
-  - subject bytes (optional IPFS)
+  - subject bytes in a CAS (local filesystem CAS is the baseline)
   - attestations (object store / database / filesystem)
   - policies (versioned config)
 - A **resolver runner** (on-demand, scheduled, or node service)

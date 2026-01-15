@@ -7,6 +7,7 @@
 - Stability & versioning: [docs/STABILITY.md](docs/STABILITY.md)
 - CLI how-to: [docs/CLI.md](docs/CLI.md)
 - Integration guide: [docs/Integration.md](docs/Integration.md)
+- Flux integration: [docs/FluxIntegration.md](docs/FluxIntegration.md)
 - End-to-end workflows: [docs/UseCases.md](docs/UseCases.md)
 - Runnable scripts: [docs/examples/README.md](docs/examples/README.md)
 

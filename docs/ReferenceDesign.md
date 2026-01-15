@@ -108,7 +108,7 @@ Properties:
 
 * Immutable
 * Content-addressed
-* Stored via IPFS or equivalent CAS
+* Stored via content-addressed storage (CAS); IPFS is one optional transport
 
 ---
 
@@ -118,7 +118,7 @@ An **Attestation** is a signed statement about a document or another attestation
 
 Canonical form: CATF
 Authoritative bytes: CATF canonicalization
-Storage: IPFS (CID derived from CATF bytes)
+Storage: CAS (CID derived from canonical CATF bytes)
 
 Attestations are append-only and never overwritten.
 
@@ -395,7 +395,7 @@ Resolvers MUST NOT conflate these.
 
 Minimum requirements:
 
-* Content-addressed storage (IPFS-compatible)
+* Content-addressed storage (CAS) compatible with the CID rules in §2.4
 * Optional pinning
 * Offline archives supported
 
@@ -1539,7 +1539,8 @@ Resolvers MUST:
 
 CROF documents:
 
-* MAY be stored on IPFS
+* MAY be stored in any CAS
+* MAY be transported via IPFS
 * MAY be CID-addressed
 * MAY be cross-signed
 * MAY be superseded by later CROFs
