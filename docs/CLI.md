@@ -96,6 +96,8 @@ SUBJECT_CID="$(go run ./cmd/xdao-catf doc-cid ../examples/whitepaper.txt)"
 
 `doc-cid` only computes the CID; it does not store bytes anywhere.
 
+IPFS usage is optional. CATF/CROF workflows work fully offline without IPFS; IPFS is one possible transport/pinning layer.
+
 If you have the Kubo `ipfs` CLI installed, you can store the file bytes into your **local IPFS repo** (even if `ipfs daemon` is not running) as a **raw block** so the returned CID matches `doc-cid`:
 
 ```sh

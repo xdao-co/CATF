@@ -41,6 +41,8 @@ Notes:
 
 By default, the scripts use `xdao-catf doc-cid` (CID computation only).
 
+IPFS is optional: the scripts work fully offline without IPFS.
+
 If you want the scripts to also store the subject bytes into a local IPFS repo (no daemon required), set:
 
 ```sh

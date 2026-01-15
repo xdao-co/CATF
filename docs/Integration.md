@@ -309,6 +309,8 @@ Resolver compliance mode (optional):
   --att /tmp/a1.catf
 ```
 
+Programmatic note: for API/Flux-style integrations, treat `compliance` as a required input. Do not rely on implicit defaults.
+
 If you are producing a revised CROF and want to declare it supersedes a prior CROF, pass the prior CROF CID:
 
 ```sh
@@ -334,14 +336,23 @@ Go integration pattern:
 oldCID, err := crof.CID(oldCROFBytes)
 if err != nil { /* old CROF must be canonical */ }
 
-newCROFBytes := crof.Render(
-  res,
-  crof.PolicyCID(policyBytes),
-  attestationCIDs,
-  crof.RenderOptions{ResolverID: "your-resolver", SupersedesCROFCID: oldCID},
-)
+req := model.ResolverRequest{
+  SubjectCID: subjectCID,
+  Policy:     model.BlobRef{Bytes: policyBytes},
+  Attestations: []model.BlobRef{
+    {Bytes: attestationBytes1},
+    {Bytes: attestationBytes2},
+  },
+  Compliance: model.ComplianceStrict,
+}
 
-if err := crof.ValidateSupersession(newCROFBytes, oldCROFBytes); err != nil {
+resp, err := model.ResolveAndRenderCROF(req, model.ResolveOptions{
+  CAS: cas,
+  CROFOptions: crof.RenderOptions{ResolverID: "your-resolver", SupersedesCROFCID: oldCID},
+})
+if err != nil { /* handle */ }
+
+if err := crof.ValidateSupersession(resp.CROF.Bytes, oldCROFBytes); err != nil {
   /* invalid supersession relationship */
 }
 ```
@@ -349,15 +360,24 @@ if err := crof.ValidateSupersession(newCROFBytes, oldCROFBytes); err != nil {
 Go integration:
 
 ```go
-res, err := resolver.ResolveWithOptions(attestationBytesList, policyBytes, subjectCID, resolver.Options{Mode: compliance.Permissive})
+// Recommended for API/Flux integrations: use stable DTOs and CAS hydration.
+// Policy/attestations may be passed as bytes or CIDs; when using CIDs you must
+// provide a CAS capable of hydrating by CID.
+
+req := model.ResolverRequest{
+  SubjectCID: subjectCID,
+  Policy:     model.BlobRef{Bytes: policyBytes},
+  Attestations: []model.BlobRef{
+    {Bytes: attestationBytes1},
+    {Bytes: attestationBytes2},
+  },
+  Compliance: model.ComplianceStrict,
+}
+
+resp, err := model.ResolveAndRenderCROF(req, model.ResolveOptions{CAS: cas})
 if err != nil { /* handle */ }
 
-crofBytes := crof.Render(
-  res,
-  crof.PolicyCID(policyBytes),
-  attestationCIDs,
-  crof.RenderOptions{ResolverID: "your-resolver"},
-)
+crofBytes := resp.CROF.Bytes
 ```
 
 Your application typically consumes:
