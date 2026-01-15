@@ -2,6 +2,30 @@
 
 These scripts exercise the repo end-to-end (CATF → TPDL → Resolver → CROF) using the minimal CLI.
 
+## Walkthrough: store everything in a CAS
+
+These walkthroughs explicitly store **all artifacts** (subject bytes, trust policy, attestations, and CROF output) into a content-addressable store, then resolve using only CIDs.
+
+Under the hood they use `./bin/xdao-catf` (to generate attestations) plus a small helper binary `./bin/xdao-cascli` (to put/get/resolve via a chosen CAS backend).
+
+- Local filesystem CAS:
+
+```sh
+make walkthrough-localfs
+```
+
+- Local IPFS repo (optional; requires Kubo `ipfs` on PATH):
+
+```sh
+make walkthrough-ipfs
+```
+
+To run both:
+
+```sh
+make walkthrough
+```
+
 ## Prereqs
 
 - Go 1.22+

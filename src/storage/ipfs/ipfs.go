@@ -90,7 +90,7 @@ func (c *CAS) Put(data []byte) (cid.Cid, error) {
 	}
 	defer os.Remove(path)
 
-	base := []string{"block", "put", "--quiet"}
+	base := []string{"block", "put"}
 	if c.pin {
 		base = append(base, "--pin")
 	}
