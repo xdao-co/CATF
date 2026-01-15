@@ -4,10 +4,10 @@ Spec: xdao-tpdl-1
 Version: 1
 
 TRUST
-Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
+Key: ed25519:Zej5sLxurhJBafBXb5c2LSlajPX3cLReFDV85kfTPuw=
 Role: author
 
-Key: ed25519:Zej5sLxurhJBafBXb5c2LSlajPX3cLReFDV85kfTPuw=
+Key: ed25519:vHy8tWNjdfodgkNNRmck2SN39TuYBpXdSdJtDOEiBaU=
 Role: author
 
 RULES

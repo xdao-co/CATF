@@ -1,4 +1,4 @@
-.PHONY: help all build clean test test-unit test-integration fmt vet examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs
+.PHONY: help all build clean test test-unit test-integration fmt vet regen-conformance examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs
 
 SHELL := /bin/bash
 
@@ -15,6 +15,7 @@ help:
 	@echo "  test             Run unit tests (default build tags)"
 	@echo "  test-unit        Alias for test"
 	@echo "  test-integration Run integration tests (build tag: integration)"
+	@echo "  regen-conformance Regenerate src/testdata/conformance fixtures"
 	@echo "  fmt              Format Go code"
 	@echo "  vet              Run go vet"
 	@echo "  examples         Run all example scripts"
@@ -46,6 +47,9 @@ test-unit:
 
 test-integration:
 	$(GO) -C "$(SRC_DIR)" test -tags=integration ./...
+
+regen-conformance:
+	bash "$(SRC_DIR)/scripts/regen-conformance.sh"
 
 fmt:
 	$(GO) -C "$(SRC_DIR)" fmt ./...
