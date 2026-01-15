@@ -31,6 +31,10 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
   - `(*CATF).CID() (string, error)`
   - `(*CATF).Verify() error`
   - Structured error type: `*catf.Error` (`Kind`, `RuleID`)
+  - Error helpers
+    - `Kind`
+    - `IsKind(error, Kind) bool`
+    - `RuleID(error) string`
 
 - Package `xdao.co/catf/resolver`
   - `Resolve(attestations, policy, subjectCID)`
@@ -42,10 +46,14 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
     - `NameResolution`, `NameFork`
 
 - Package `xdao.co/catf/crof`
-  - `Render`, `RenderSigned`, `CID`, `ValidateSupersession`
+  - `Render`, `RenderSigned`, `RenderWithCID`
+  - `CanonicalizeCROF([]byte) ([]byte, error)`
+  - `CID`, `SupersedesCROFCID`, `ValidateSupersession`
+  - `VerifySignature([]byte) (bool, error)`
   - `RenderWithCompliance` (strict output compliance gate)
   - Types
     - `RenderOptions`
+    - `Document` (`NewDocumentFromBytes`, `RenderDocument`)
 
 - Package `xdao.co/catf/tpdl`
   - `Parse([]byte) (*Policy, error)`
@@ -80,6 +88,14 @@ They should be used with pinning and explicit upgrade review.
 - Package `xdao.co/catf/keys`
   - Filesystem-backed key storage and convenience helpers (`KeyStore`, `CreateKeyStore`, etc.)
   - These are intentionally local-first utilities and may change independently of the protocol core.
+
+  - Convenience helpers
+    - `KeyStore`, `KeyEntry`
+    - `GetDefaultDirectory() (string, error)`
+    - `CreateKeyStore(string) (*KeyStore, error)`
+    - `CheckKeyName(string) error`
+    - `CheckRole(string) error`
+    - `ParseSeedHex(string) ([]byte, error)`
 
 - Packages under `xdao.co/catf/internal/...`
 
