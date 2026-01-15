@@ -148,7 +148,7 @@ Import MUST fail (hard) on:
 - Invalid CID strings
 
 Import SHOULD fail-closed on unknown TAR entries by default.
-An implementation MAY provide an explicit "ignore unknown" option for forwards compatibility,
+An implementation MAY provide an explicit "ignore unknown" mode for forwards compatibility,
 but it MUST still reject path traversal attempts.
 
 ## 7) Security considerations

@@ -185,7 +185,7 @@ func TestBundle_ImportAllowsUnknownEntriesWhenOptionSet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{IgnoreUnknown: true}); err != nil {
+	if err := bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{UnknownEntryPolicy: bundle.UnknownEntryPolicyIgnore}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,7 +207,7 @@ func TestBundle_ImportRejectsTraversalPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{IgnoreUnknown: true})
+	err = bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{UnknownEntryPolicy: bundle.UnknownEntryPolicyIgnore})
 	if err == nil {
 		t.Fatalf("expected error")
 	}

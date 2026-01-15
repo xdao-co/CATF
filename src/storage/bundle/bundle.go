@@ -125,11 +125,21 @@ func Export(w io.Writer, cas storage.CAS, ids []cid.Cid, opts ExportOptions) err
 
 // ImportOptions controls bundle import behavior.
 type ImportOptions struct {
-	// IgnoreUnknown controls whether unknown TAR entries are ignored.
+	// UnknownEntryPolicy controls how unknown TAR entries are handled.
 	//
-	// Default (false) is fail-closed: unknown entries cause Import to return an error.
-	IgnoreUnknown bool
+	// Default is UnknownEntryPolicyFailClosed.
+	UnknownEntryPolicy UnknownEntryPolicy
 }
+
+// UnknownEntryPolicy controls how bundle import handles unknown TAR entries.
+type UnknownEntryPolicy int
+
+const (
+	// UnknownEntryPolicyFailClosed causes unknown TAR entries to fail import.
+	UnknownEntryPolicyFailClosed UnknownEntryPolicy = iota
+	// UnknownEntryPolicyIgnore causes unknown TAR entries to be ignored.
+	UnknownEntryPolicyIgnore
+)
 
 // Import reads a bundle from r and imports all blocks into cas.
 //
@@ -145,6 +155,9 @@ func Import(r io.Reader, cas storage.CAS) error {
 func ImportWithOptions(r io.Reader, cas storage.CAS, opts ImportOptions) error {
 	if cas == nil {
 		return fmt.Errorf("bundle: nil CAS")
+	}
+	if opts.UnknownEntryPolicy == 0 {
+		opts.UnknownEntryPolicy = UnknownEntryPolicyFailClosed
 	}
 
 	tr := tar.NewReader(r)
@@ -164,7 +177,7 @@ func ImportWithOptions(r io.Reader, cas storage.CAS, opts ImportOptions) error {
 		}
 
 		if h.Typeflag != tar.TypeReg {
-			if opts.IgnoreUnknown {
+			if opts.UnknownEntryPolicy == UnknownEntryPolicyIgnore {
 				continue
 			}
 			return fmt.Errorf("bundle: unexpected tar entry type: %v (%s)", h.Typeflag, name)
@@ -177,7 +190,7 @@ func ImportWithOptions(r io.Reader, cas storage.CAS, opts ImportOptions) error {
 		}
 
 		if !strings.HasPrefix(name, "blocks/") {
-			if opts.IgnoreUnknown {
+			if opts.UnknownEntryPolicy == UnknownEntryPolicyIgnore {
 				_, _ = io.Copy(io.Discard, tr)
 				continue
 			}
