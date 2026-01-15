@@ -1,14 +1,14 @@
 # xDAO CATF
 
-- Reference design: [ReferenceDesign.md](ReferenceDesign.md)
-- Structural contract (normative): [spec/CATF-STRUCT-1.md](spec/CATF-STRUCT-1.md)
-- Error taxonomy & rule catalog (normative): [spec/CATF-ERRORS-1.md](spec/CATF-ERRORS-1.md)
-- Conformance vectors: [CONFORMANCE.md](CONFORMANCE.md)
-- Stability & versioning: [STABILITY.md](STABILITY.md)
-- CLI how-to: [CLI.md](CLI.md)
-- Integration guide: [Integration.md](Integration.md)
-- End-to-end workflows: [UseCases.md](UseCases.md)
-- Runnable scripts: [examples/README.md](examples/README.md)
+- Reference design: [docs/ReferenceDesign.md](docs/ReferenceDesign.md)
+- Structural contract (normative): [docs/spec/CATF-STRUCT-1.md](docs/spec/CATF-STRUCT-1.md)
+- Error taxonomy & rule catalog (normative): [docs/spec/CATF-ERRORS-1.md](docs/spec/CATF-ERRORS-1.md)
+- Conformance vectors: [docs/CONFORMANCE.md](docs/CONFORMANCE.md)
+- Stability & versioning: [docs/STABILITY.md](docs/STABILITY.md)
+- CLI how-to: [docs/CLI.md](docs/CLI.md)
+- Integration guide: [docs/Integration.md](docs/Integration.md)
+- End-to-end workflows: [docs/UseCases.md](docs/UseCases.md)
+- Runnable scripts: [docs/examples/README.md](docs/examples/README.md)
 
 ## Glossary
 
@@ -140,15 +140,15 @@ A platform for decentralized coordination based on evidence, policy, and determi
 Go integration note:
 
 - Prefer signing helpers from `xdao.co/catf/keys` (`keys.SignEd25519SHA256`, `keys.SignDilithium3`) over the deprecated `catf.Sign*` wrappers.
-- The recommended attestation signing flow is documented in [Integration.md](Integration.md#go-integration-recommended-for-applications).
+- The recommended attestation signing flow is documented in [docs/Integration.md](docs/Integration.md#go-integration-recommended-for-applications).
 
 ## Documentation sync policy
 
 When changing behavior or formats in the reference implementation:
 
-- CLI flags/outputs: update [CLI.md](CLI.md)
-- Integration-facing behavior/APIs: update [Integration.md](Integration.md)
-- Normative format rules and examples: update [ReferenceDesign.md](ReferenceDesign.md)
+- CLI flags/outputs: update [docs/CLI.md](docs/CLI.md)
+- Integration-facing behavior/APIs: update [docs/Integration.md](docs/Integration.md)
+- Normative format rules and examples: update [docs/ReferenceDesign.md](docs/ReferenceDesign.md)
 
 ## Developer guardrails (git hook + CI)
 
