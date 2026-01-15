@@ -227,7 +227,7 @@ At a high level:
 
 1) Build a `catf.Document`
 2) Render it canonically
-3) Parse to get the canonical signing scope (`parsed.Signed`)
+3) Parse to get the canonical signing scope (`SignedBytes()`)
 4) Compute the signature and render final bytes
 
 Sketch:
@@ -243,7 +243,7 @@ doc := catf.Document{ /* Meta, Subject, Claims, Crypto */ }
 pre, _ := catf.Render(doc)
 parsed, _ := catf.Parse(pre)
 
-// signature should be computed over parsed.Signed
+// signature should be computed over the canonical signed scope
 sig := keys.SignEd25519SHA256(parsed.SignedBytes(), priv)
 
 doc.Crypto["Signature"] = sig
