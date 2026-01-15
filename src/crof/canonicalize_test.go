@@ -2,6 +2,8 @@ package crof
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"encoding/base64"
 	"strings"
 	"testing"
 
@@ -533,6 +535,100 @@ func TestCanonicalizeCROF_RejectsResultDuplicateLine(t *testing.T) {
 	// Duplicate an existing RESULT line; validateSortedStrict should reject duplicates.
 	bad := []byte(strings.Replace(text, line, line+line, 1))
 	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsCryptoMissingResolverKey(t *testing.T) {
+	seed := make([]byte, ed25519.SeedSize)
+	for i := range seed {
+		seed[i] = 0x44
+	}
+	priv := ed25519.NewKeyFromSeed(seed)
+	pub := priv.Public().(ed25519.PublicKey)
+	resolverKey := "ed25519:" + base64.StdEncoding.EncodeToString(pub)
+
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	out := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: resolverKey, PrivateKey: priv})
+
+	text := string(out)
+	start := strings.Index(text, "Resolver-Key: "+resolverKey+"\n")
+	if start < 0 {
+		t.Fatalf("missing Resolver-Key line in signed output")
+	}
+	bad := []byte(strings.Replace(text, "Resolver-Key: "+resolverKey+"\n", "", 1))
+	if bytes.Equal(out, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsCryptoInvalidKVFormatting(t *testing.T) {
+	seed := make([]byte, ed25519.SeedSize)
+	for i := range seed {
+		seed[i] = 0x45
+	}
+	priv := ed25519.NewKeyFromSeed(seed)
+	pub := priv.Public().(ed25519.PublicKey)
+	resolverKey := "ed25519:" + base64.StdEncoding.EncodeToString(pub)
+
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	out := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: resolverKey, PrivateKey: priv})
+
+	text := string(out)
+	idx := strings.Index(text, "Signature-Alg: ")
+	if idx < 0 {
+		t.Fatalf("missing Signature-Alg line in signed output")
+	}
+	lineEnd := strings.Index(text[idx:], "\n")
+	if lineEnd < 0 {
+		t.Fatalf("malformed signed output")
+	}
+	lineEnd = idx + lineEnd + 1
+	line := text[idx:lineEnd]
+	mutated := strings.Replace(line, ": ", " ", 1)
+	if mutated == line {
+		t.Fatalf("failed to mutate key-value formatting")
+	}
+	bad := []byte(text[:idx] + mutated + text[lineEnd:])
+	if bytes.Equal(out, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsCryptoDuplicateLine(t *testing.T) {
+	seed := make([]byte, ed25519.SeedSize)
+	for i := range seed {
+		seed[i] = 0x46
+	}
+	priv := ed25519.NewKeyFromSeed(seed)
+	pub := priv.Public().(ed25519.PublicKey)
+	resolverKey := "ed25519:" + base64.StdEncoding.EncodeToString(pub)
+
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	out := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: resolverKey, PrivateKey: priv})
+
+	text := string(out)
+	idx := strings.Index(text, "Hash-Alg: ")
+	if idx < 0 {
+		t.Fatalf("missing Hash-Alg line in signed output")
+	}
+	lineEnd := strings.Index(text[idx:], "\n")
+	if lineEnd < 0 {
+		t.Fatalf("malformed signed output")
+	}
+	lineEnd = idx + lineEnd + 1
+	line := text[idx:lineEnd]
+	bad := []byte(text[:idx] + line + text[idx:])
+	if bytes.Equal(out, bad) {
 		t.Fatalf("failed to mutate CROF bytes")
 	}
 	if _, err := CanonicalizeCROF(bad); err == nil {
