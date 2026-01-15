@@ -91,14 +91,14 @@ They should be used with pinning and explicit upgrade review.
 - Package `xdao.co/catf/catf`
   - `NormalizeCATF([]byte) ([]byte, error)` (model-first canonicalization helper)
 
+- Package `xdao.co/catf/keys`
+  - Filesystem-backed key storage and convenience helpers (`KeyStore`, `CreateKeyStore`, etc.)
+  - These are intentionally local-first utilities and may change independently of the protocol core.
+
   - Convenience crypto helpers (message signing primitives; not protocol-specific)
     - `SignEd25519SHA256([]byte, ed25519.PrivateKey) string`
     - `SignDilithium3([]byte, string, *mode3.PrivateKey) (string, error)`
     - `GenerateDilithium3Keypair(io.Reader) (*mode3.PublicKey, *mode3.PrivateKey, error)`
-
-- Package `xdao.co/catf/keys`
-  - Filesystem-backed key storage and convenience helpers (`KeyStore`, `CreateKeyStore`, etc.)
-  - These are intentionally local-first utilities and may change independently of the protocol core.
 
   - Convenience helpers
     - `KeyStore`, `KeyEntry`

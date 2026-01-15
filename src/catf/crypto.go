@@ -194,6 +194,8 @@ func decodeBase64(s string) ([]byte, error) {
 }
 
 // SignEd25519SHA256 returns a base64 signature over sha256(message).
+//
+// Deprecated: use `keys.SignEd25519SHA256`.
 func SignEd25519SHA256(message []byte, privateKey ed25519.PrivateKey) string {
 	digest := sha256.Sum256(message)
 	sig := ed25519.Sign(privateKey, digest[:])
@@ -202,6 +204,8 @@ func SignEd25519SHA256(message []byte, privateKey ed25519.PrivateKey) string {
 
 // SignDilithium3 returns a base64 dilithium3 signature over hash(message).
 // hashAlg must be one of: sha256, sha512, sha3-256.
+//
+// Deprecated: use `keys.SignDilithium3`.
 func SignDilithium3(message []byte, hashAlg string, privateKey *mode3.PrivateKey) (string, error) {
 	if privateKey == nil {
 		return "", newError(KindCrypto, "CATF-CRYPTO-501", "missing private key")
@@ -216,6 +220,8 @@ func SignDilithium3(message []byte, hashAlg string, privateKey *mode3.PrivateKey
 }
 
 // GenerateDilithium3Keypair returns a new Dilithium3 keypair.
+//
+// Deprecated: use `keys.GenerateDilithium3Keypair`.
 func GenerateDilithium3Keypair(rand io.Reader) (*mode3.PublicKey, *mode3.PrivateKey, error) {
 	return mode3.GenerateKey(rand)
 }
