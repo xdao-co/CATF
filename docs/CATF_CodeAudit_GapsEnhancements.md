@@ -40,7 +40,7 @@ Evidence in repo:
 ## 1. GAPS (Missing to be “complete library”)
 
 ### GAP-01 — Storage is not a first‑class subsystem (CAS interface + adapters)
-**Problem:** The repo uses CIDs and talks about IPFS compatibility, but there is **no CAS interface** and **no storage adapters**.
+**Problem:** The repo uses CIDs and talks about IPFS compatibility, but without a CAS subsystem the integration story becomes ad-hoc.
 **Impact:** Any API layer or Flux/controller integration has to invent storage semantics (risking non‑portable behavior).
 
 **Status update (2026-01-15):** Implemented in core library.
@@ -51,6 +51,7 @@ Evidence in repo:
 - `src/storage/errors.go` (stable storage errors)
 - `src/storage/multi.go` (deterministic adapter composition)
 - `src/storage/localfs/localfs.go` (offline, write-once filesystem CAS)
+- `src/storage/ipfs/ipfs.go` (optional IPFS adapter; shells out to local `ipfs` CLI)
 - `src/storage/testkit/cas.go` (conformance harness)
 
 **Required fixes:**
@@ -70,7 +71,10 @@ Evidence in repo:
 
 - Core CAS interface: Implemented
 - Local filesystem CAS: Implemented
-- Optional adapters (IPFS/HTTP/bundle): Not implemented (by design, still optional)
+- Optional adapters:
+  - IPFS: Implemented (`src/storage/ipfs`)
+  - HTTP mirror: Not implemented (optional)
+  - Bundle/archive: Not implemented (optional)
 
 **Concrete deliverables (suggested paths):**
 
@@ -84,6 +88,7 @@ Evidence in repo:
 
 - Deterministic CAS conformance tests: `Put/Get` roundtrip and hash mismatch detection
 - LocalFS immutability test (write-once semantics)
+- Optional: IPFS adapter conformance test (skipped by default; runnable when `ipfs` is available)
 
 ---
 
@@ -213,7 +218,7 @@ This becomes your “Library of Alexandria” mechanism.
 
 Deliverable (suggested):
 
-- `src/storage/bundle/format.md`
+- `src/storage/bundle/format.md` (spec added)
 - `src/storage/bundle/*` implementation
 
 ---
@@ -229,7 +234,7 @@ To keep the CATF/CID contract intact **and** eliminate reliance on a non-self-co
 
 ### Optional transports (MAY)
 
-1. IPFS adapter (best-effort publish/fetch; verify bytes)
+1. IPFS adapter (best-effort publish/fetch; verify bytes) — implemented (`src/storage/ipfs`)
 2. HTTP mirror adapter (best-effort; verify bytes)
 3. Offline bundle adapter
 
