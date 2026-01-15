@@ -872,6 +872,162 @@ func TestCanonicalizeCROF_RejectsResultMalformedPolicyVerdictLine(t *testing.T) 
 	}
 }
 
+func TestCanonicalizeCROF_RejectsResultMalformedPolicyVerdict_InvalidQuorum(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		PolicyVerdicts: []resolver.PolicyVerdict{{
+			Type:      "authorship",
+			Role:      "author",
+			Quorum:    1,
+			Observed:  1,
+			Satisfied: true,
+		}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+	if _, err := CanonicalizeCROF(b); err != nil {
+		t.Fatalf("expected canonical output, got: %v", err)
+	}
+
+	text := string(b)
+	idx := strings.Index(text, "Policy-Verdict: ")
+	if idx < 0 {
+		t.Fatalf("missing Policy-Verdict line")
+	}
+	end := strings.Index(text[idx:], "\n")
+	if end < 0 {
+		t.Fatalf("malformed output")
+	}
+	end = idx + end + 1
+	line := text[idx:end]
+	mut := strings.Replace(line, "Quorum=1", "Quorum=x", 1)
+	if mut == line {
+		t.Fatalf("failed to mutate policy verdict line")
+	}
+	bad := []byte(text[:idx] + mut + text[end:])
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultMalformedPolicyVerdict_InvalidSatisfied(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		PolicyVerdicts: []resolver.PolicyVerdict{{
+			Type:      "authorship",
+			Role:      "author",
+			Quorum:    1,
+			Observed:  1,
+			Satisfied: true,
+		}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+	if _, err := CanonicalizeCROF(b); err != nil {
+		t.Fatalf("expected canonical output, got: %v", err)
+	}
+
+	text := string(b)
+	idx := strings.Index(text, "Policy-Verdict: ")
+	if idx < 0 {
+		t.Fatalf("missing Policy-Verdict line")
+	}
+	end := strings.Index(text[idx:], "\n")
+	if end < 0 {
+		t.Fatalf("malformed output")
+	}
+	end = idx + end + 1
+	line := text[idx:end]
+	mut := strings.Replace(line, "Satisfied=true", "Satisfied=maybe", 1)
+	if mut == line {
+		t.Fatalf("failed to mutate policy verdict line")
+	}
+	bad := []byte(text[:idx] + mut + text[end:])
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultMalformedPolicyVerdict_UnknownField(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		PolicyVerdicts: []resolver.PolicyVerdict{{
+			Type:      "authorship",
+			Role:      "author",
+			Quorum:    1,
+			Observed:  1,
+			Satisfied: true,
+		}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+	if _, err := CanonicalizeCROF(b); err != nil {
+		t.Fatalf("expected canonical output, got: %v", err)
+	}
+
+	text := string(b)
+	idx := strings.Index(text, "Policy-Verdict: ")
+	if idx < 0 {
+		t.Fatalf("missing Policy-Verdict line")
+	}
+	end := strings.Index(text[idx:], "\n")
+	if end < 0 {
+		t.Fatalf("malformed output")
+	}
+	end = idx + end + 1
+	line := text[idx:end]
+	mut := strings.Replace(line, "Satisfied=true", "Satisfied=true; Bogus=x", 1)
+	if mut == line {
+		t.Fatalf("failed to mutate policy verdict line")
+	}
+	bad := []byte(text[:idx] + mut + text[end:])
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultMalformedPolicyVerdict_DuplicateField(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		PolicyVerdicts: []resolver.PolicyVerdict{{
+			Type:      "authorship",
+			Role:      "author",
+			Quorum:    1,
+			Observed:  1,
+			Satisfied: true,
+		}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+	if _, err := CanonicalizeCROF(b); err != nil {
+		t.Fatalf("expected canonical output, got: %v", err)
+	}
+
+	text := string(b)
+	idx := strings.Index(text, "Policy-Verdict: ")
+	if idx < 0 {
+		t.Fatalf("missing Policy-Verdict line")
+	}
+	end := strings.Index(text[idx:], "\n")
+	if end < 0 {
+		t.Fatalf("malformed output")
+	}
+	end = idx + end + 1
+	line := text[idx:end]
+	mut := strings.Replace(line, "Type=", "Type=authorship; Type=", 1)
+	if mut == line {
+		t.Fatalf("failed to mutate policy verdict line")
+	}
+	bad := []byte(text[:idx] + mut + text[end:])
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
 func TestCanonicalizeCROF_RejectsResultMalformedPolicyIssuerKey_MissingField(t *testing.T) {
 	res := &resolver.Resolution{
 		SubjectCID: "bafy-doc-1",
