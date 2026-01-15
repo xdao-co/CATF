@@ -101,3 +101,72 @@ func TestCanonicalizeCROF_RejectsMissingBlankLineAfterSection(t *testing.T) {
 		t.Fatalf("expected CanonicalizeCROF error")
 	}
 }
+
+func TestCanonicalizeCROF_RejectsBOM(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	bad := append([]byte{0xEF, 0xBB, 0xBF}, b...)
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsInvalidUTF8(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	bad := append([]byte(nil), b...)
+	bad[0] = 0xFF
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsMissingPreamble(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text, Preamble+"\n", "BOGUS-PREAMBLE\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsMissingPostamble(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text, "\n"+Postamble+"\n", "\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsUnexpectedContentBeforePostamble(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text, "\n"+Postamble+"\n", "\nX\n"+Postamble+"\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsEmptyInput(t *testing.T) {
+	if _, err := CanonicalizeCROF(nil); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
