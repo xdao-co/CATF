@@ -46,6 +46,20 @@ Design notes:
 - Transport is not authority: even if bytes were obtained from IPFS or an object store, they MUST be validated against the CID.
 - If you use multiple adapters, the adapter order MUST be deterministic (slice order).
 
+### Plugging in your own CAS
+
+Any CAS provider can integrate by implementing `xdao.co/catf/storage.CAS`.
+If you need multiple backends (e.g. local filesystem + an optional transport), compose them deterministically with `storage.MultiCAS`.
+
+Sketch:
+
+```go
+local, _ := localfs.New("/var/lib/flux/cas")
+// transport := ipfs.New(ipfs.Options{}) // optional adapter
+
+cas := storage.MultiCAS{Adapters: []storage.CAS{local /*, transport */}}
+```
+
 ---
 
 ## Recommended call pattern

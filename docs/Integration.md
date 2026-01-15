@@ -58,6 +58,42 @@ Design note:
 
 - Reachability is not validity. Whether bytes came from a database, filesystem, or IPFS transport, the bytes MUST be verified against the CID (hash mismatch must be treated as an error).
 
+#### Implementing your own CAS provider
+
+Any storage system can integrate by implementing `xdao.co/catf/storage.CAS`.
+This lets you plug in S3/GCS, a database, a distributed store, etc., without changing resolver logic.
+
+Minimal sketch:
+
+```go
+type MyCAS struct{}
+
+func (c *MyCAS) Put(b []byte) (cid.Cid, error) { /* store immutably, return CID */ }
+func (c *MyCAS) Get(id cid.Cid) ([]byte, error) { /* return bytes or storage.ErrNotFound */ }
+func (c *MyCAS) Has(id cid.Cid) bool { /* best-effort existence check */ }
+```
+
+Contract requirements:
+
+- `Put` MUST be idempotent.
+- Stored objects MUST be immutable.
+- `Get` MUST return `storage.ErrNotFound` when absent.
+- `Get` SHOULD validate that returned bytes hash to the requested CID and return `storage.ErrCIDMismatch` on mismatch.
+
+#### Composing multiple providers (deterministic)
+
+If you want to consult multiple stores (e.g., local first, then optional transports), use `storage.MultiCAS`.
+Adapter ordering is slice order (deterministic).
+
+```go
+local, _ := localfs.New("/var/lib/xdao/cas")
+ipfsCAS := ipfs.New(ipfs.Options{}) // optional
+
+cas := storage.MultiCAS{Adapters: []storage.CAS{local, ipfsCAS}}
+```
+
+Note: writes go to the first adapter only; reads try adapters in order.
+
 ### Optional: IPFS as a transport (not a requirement)
 
 IPFS is an optional transport/pinning layer for exchanging blocks with other peers. It is not required to use CATF.

@@ -5,7 +5,7 @@ import (
 	"github.com/multiformats/go-multihash"
 )
 
-// CIDv1RawSHA256 returns an IPFS-compatible CIDv1 string using the "raw" multicodec
+// CIDv1RawSHA256 returns a CIDv1 string using the "raw" multicodec
 // and a sha2-256 multihash.
 func CIDv1RawSHA256(data []byte) string {
 	sum, err := multihash.Sum(data, multihash.SHA2_256, -1)
@@ -17,7 +17,7 @@ func CIDv1RawSHA256(data []byte) string {
 	return cid.NewCidV1(cid.Raw, sum).String()
 }
 
-// CIDv1RawSHA256CID returns an IPFS-compatible CIDv1 (raw + sha2-256) derived from data.
+// CIDv1RawSHA256CID returns a CIDv1 (raw + sha2-256) derived from data.
 func CIDv1RawSHA256CID(data []byte) (cid.Cid, error) {
 	sum, err := multihash.Sum(data, multihash.SHA2_256, -1)
 	if err != nil {
