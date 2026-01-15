@@ -1,0 +1,6 @@
+# Ensure specific conformance vectors keep their intended (non-canonical) line endings.
+#
+# The CATF parser rejects CRLF inputs as non-canonical; the corresponding test
+# vectors must therefore be checked out with CRLF line endings on all platforms.
+
+*.noncanonical_crlf.catf text eol=crlf
