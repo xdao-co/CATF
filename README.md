@@ -150,6 +150,18 @@ When changing behavior or formats in the reference implementation:
 - Integration-facing behavior/APIs: update [Integration.md](Integration.md)
 - Normative format rules and examples: update [ReferenceDesign.md](ReferenceDesign.md)
 
+## Developer guardrails (git hook + CI)
+
+This repo includes a small guard script that prevents new code from using deprecated signing helpers from `xdao.co/catf/catf` (outside the compatibility wrapper file). CI enforces this on pull requests.
+
+To enable the same guard locally, opt into the repo’s git hooks:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+This enables the pre-commit hook in `.githooks/pre-commit`, which runs `scripts/guard_no_deprecated_catf_sign.sh`.
+
 ## IPFS note (local vs network publishing)
 
 - The reference workflows assume your local node (e.g. an XDAO Node) has the Kubo `ipfs` CLI installed.
