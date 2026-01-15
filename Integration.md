@@ -233,17 +233,24 @@ At a high level:
 Sketch:
 
 ```go
+import (
+  "xdao.co/catf/catf"
+  "xdao.co/catf/keys"
+)
+
 // Pseudocode sketch: see packages in ./src for exact APIs.
 doc := catf.Document{ /* Meta, Subject, Claims, Crypto */ }
 pre, _ := catf.Render(doc)
 parsed, _ := catf.Parse(pre)
 
 // signature should be computed over parsed.Signed
-sig := catf.SignEd25519SHA256(parsed.Signed, priv)
+sig := keys.SignEd25519SHA256(parsed.SignedBytes(), priv)
 
 doc.Crypto["Signature"] = sig
 finalBytes, _ := catf.Render(doc)
 ```
+
+Note: `catf.SignEd25519SHA256` (and related helpers) are deprecated; prefer the non-protocol utility helpers in `xdao.co/catf/keys`.
 
 Crypto agility notes:
 
