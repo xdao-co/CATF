@@ -153,3 +153,78 @@ Supersedes:
 		t.Fatalf("expected 2 allowed-by roles, got %+v", policy.SupersedesAllowedBy)
 	}
 }
+
+func TestParseInvalidTPDL_RequireUnknownField(t *testing.T) {
+	policyText := `-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+Spec: xdao-tpdl-1
+
+TRUST
+Key: ed25519:K1
+Role: author
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+  Nope: 1
+-----END XDAO TRUST POLICY-----`
+
+	if _, err := Parse([]byte(policyText)); err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
+func TestParseInvalidTPDL_InvalidQuorum(t *testing.T) {
+	policyText := `-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+Spec: xdao-tpdl-1
+
+TRUST
+Key: ed25519:K1
+Role: author
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+  Quorum: 0
+-----END XDAO TRUST POLICY-----`
+
+	if _, err := Parse([]byte(policyText)); err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
+func TestParseStrictTPDL_RejectsAnyRequireMissingQuorum(t *testing.T) {
+	// First Require omits Quorum (permissive defaults to 1), second includes it.
+	// Strict should reject because *any* Require block missing Quorum violates "no defaults".
+	policyText := `-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+Spec: xdao-tpdl-1
+
+TRUST
+Key: ed25519:K1
+Role: author
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+
+Require:
+  Type: approval
+  Role: author
+  Quorum: 1
+-----END XDAO TRUST POLICY-----`
+
+	if _, err := Parse([]byte(policyText)); err != nil {
+		t.Fatalf("expected permissive Parse ok, got %v", err)
+	}
+	if _, err := ParseStrict([]byte(policyText)); err == nil {
+		t.Fatalf("expected strict parse error")
+	}
+}
