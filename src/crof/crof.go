@@ -52,6 +52,73 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 		resolverID = "xdao-resolver-reference"
 	}
 
+	canSign := opts.ResolverKey != "" && len(opts.PrivateKey) == ed25519.PrivateKeySize
+	var cryptoLines []string
+	if canSign {
+		cryptoLines = []string{
+			"Hash-Alg: sha256",
+			"Resolver-Key: " + opts.ResolverKey,
+			"Signature-Alg: ed25519",
+			"Signature: 0",
+		}
+		sort.Strings(cryptoLines)
+	}
+
+	out := renderWithCryptoLines(res, trustPolicyCID, attestationCIDs, resolverID, opts, cryptoLines)
+	if canSign {
+		sig, err := signCROF(out, opts.PrivateKey)
+		if err != nil {
+			// Never panic in library code; fall back to unsigned output.
+			return renderWithCryptoLines(res, trustPolicyCID, attestationCIDs, resolverID, opts, nil)
+		}
+		out = []byte(strings.Replace(string(out), "Signature: 0", "Signature: "+sig, 1))
+	}
+
+	return out
+}
+
+// RenderSigned renders CROF with a required ed25519 signature.
+//
+// This returns an error instead of panicking if signing is requested but cannot be performed.
+func RenderSigned(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []string, opts RenderOptions) ([]byte, error) {
+	if opts.ResolverKey == "" {
+		return nil, errors.New("crof: signing requires ResolverKey")
+	}
+	if len(opts.PrivateKey) != ed25519.PrivateKeySize {
+		return nil, errors.New("crof: signing requires a valid ed25519 private key")
+	}
+
+	resolverID := opts.ResolverID
+	if resolverID == "" {
+		resolverID = "xdao-resolver-reference"
+	}
+
+	cryptoLines := []string{
+		"Hash-Alg: sha256",
+		"Resolver-Key: " + opts.ResolverKey,
+		"Signature-Alg: ed25519",
+		"Signature: 0",
+	}
+	sort.Strings(cryptoLines)
+
+	out := renderWithCryptoLines(res, trustPolicyCID, attestationCIDs, resolverID, opts, cryptoLines)
+	sig, err := signCROF(out, opts.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	out = []byte(strings.Replace(string(out), "Signature: 0", "Signature: "+sig, 1))
+	return out, nil
+}
+
+func renderWithCryptoLines(
+	res *resolver.Resolution,
+	trustPolicyCID string,
+	attestationCIDs []string,
+	resolverID string,
+	opts RenderOptions,
+	cryptoLines []string,
+) []byte {
+
 	inputIDs := append([]string(nil), attestationCIDs...)
 	var attCIDs []string
 	var inputHashes []string
@@ -295,15 +362,6 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 
 	// CRYPTO (left empty in this reference implementation)
 	sb.WriteString("CRYPTO\n")
-	cryptoLines := []string{}
-	if opts.ResolverKey != "" {
-		cryptoLines = append(cryptoLines,
-			"Hash-Alg: sha256",
-			"Resolver-Key: "+opts.ResolverKey,
-			"Signature-Alg: ed25519",
-			"Signature: 0",
-		)
-	}
 	sort.Strings(cryptoLines)
 	for _, l := range cryptoLines {
 		sb.WriteString(l)
@@ -313,17 +371,7 @@ func Render(res *resolver.Resolution, trustPolicyCID string, attestationCIDs []s
 
 	sb.WriteString(Postamble)
 	sb.WriteString("\n")
-	out := []byte(sb.String())
-
-	if len(opts.PrivateKey) > 0 && opts.ResolverKey != "" {
-		sig, err := signCROF(out, opts.PrivateKey)
-		if err != nil {
-			panic("crof: signing requested but failed: " + err.Error())
-		}
-		out = []byte(strings.Replace(string(out), "Signature: 0", "Signature: "+sig, 1))
-	}
-
-	return out
+	return []byte(sb.String())
 }
 
 func uniqueSorted(items []string) []string {
@@ -393,6 +441,9 @@ func RenderWithCompliance(res *resolver.Resolution, trustPolicyCID string, attes
 	if mode == compliance.Strict {
 		if res == nil {
 			return nil, errors.New("strict mode: nil resolution")
+		}
+		if opts.ResolverID == "" {
+			return nil, errors.New("strict mode: Resolver-ID required")
 		}
 		if len(res.Exclusions) > 0 {
 			return nil, fmt.Errorf("strict mode: exclusions present (%d)", len(res.Exclusions))

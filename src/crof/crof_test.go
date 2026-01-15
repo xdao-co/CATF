@@ -74,14 +74,55 @@ func TestRender_SignsWhenKeyProvided(t *testing.T) {
 	}
 }
 
-func TestRender_PanicsOnInvalidPrivateKeyLength(t *testing.T) {
+func TestRender_DoesNotPanicOnInvalidPrivateKeyLength(t *testing.T) {
 	defer func() {
 		rec := recover()
-		if rec == nil {
-			t.Fatalf("expected panic")
+		if rec != nil {
+			t.Fatalf("unexpected panic: %v", rec)
 		}
 	}()
 
 	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
-	_ = Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: "ed25519:AA==", PrivateKey: ed25519.PrivateKey{0x01}})
+	out := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: "ed25519:AA==", PrivateKey: ed25519.PrivateKey{0x01}})
+	if len(out) == 0 {
+		t.Fatalf("expected CROF bytes")
+	}
+	signed, err := VerifySignature(out)
+	if err != nil {
+		t.Fatalf("VerifySignature: %v", err)
+	}
+	if signed {
+		t.Fatalf("expected unsigned CROF")
+	}
+}
+
+func TestRenderSigned_ReturnsErrorOnInvalidPrivateKeyLength(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	_, err := RenderSigned(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: "ed25519:AA==", PrivateKey: ed25519.PrivateKey{0x01}})
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
+func TestRenderSigned_ProducesVerifiableSignature(t *testing.T) {
+	seed := make([]byte, ed25519.SeedSize)
+	for i := range seed {
+		seed[i] = 0x5A
+	}
+	priv := ed25519.NewKeyFromSeed(seed)
+	pub := priv.Public().(ed25519.PublicKey)
+	resolverKey := "ed25519:" + base64.StdEncoding.EncodeToString(pub)
+
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	out, err := RenderSigned(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverKey: resolverKey, PrivateKey: priv})
+	if err != nil {
+		t.Fatalf("RenderSigned: %v", err)
+	}
+	signed, err := VerifySignature(out)
+	if err != nil {
+		t.Fatalf("VerifySignature: %v", err)
+	}
+	if !signed {
+		t.Fatalf("expected signed CROF")
+	}
 }

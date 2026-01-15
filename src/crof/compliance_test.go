@@ -17,7 +17,7 @@ func TestRenderWithCompliance_StrictRejectsAmbiguityAndResolvedAt(t *testing.T) 
 		Exclusions: []resolver.Exclusion{{CID: "bafy-a1", Reason: "Issuer not trusted"}},
 	}
 
-	_, err := RenderWithCompliance(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{}, compliance.Strict)
+	_, err := RenderWithCompliance(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverID: "xdao-resolver-reference"}, compliance.Strict)
 	if err == nil {
 		t.Fatalf("expected strict mode error")
 	}
@@ -25,9 +25,17 @@ func TestRenderWithCompliance_StrictRejectsAmbiguityAndResolvedAt(t *testing.T) 
 	res.State = resolver.StateResolved
 	res.Forks = nil
 	res.Exclusions = nil
-	_, err = RenderWithCompliance(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolvedAt: time.Unix(1, 0).UTC()}, compliance.Strict)
+	_, err = RenderWithCompliance(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{ResolverID: "xdao-resolver-reference", ResolvedAt: time.Unix(1, 0).UTC()}, compliance.Strict)
 	if err == nil {
 		t.Fatalf("expected strict mode error for Resolved-At")
+	}
+}
+
+func TestRenderWithCompliance_StrictRequiresResolverID(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	_, err := RenderWithCompliance(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{}, compliance.Strict)
+	if err == nil {
+		t.Fatalf("expected strict mode error")
 	}
 }
 

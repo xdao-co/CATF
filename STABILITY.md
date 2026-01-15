@@ -33,7 +33,7 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
   - `ResolveName(attestations, policy, name, version)`
 
 - Package `xdao.co/catf/crof`
-  - `Render`, `CID`, `ValidateSupersession`
+  - `Render`, `RenderSigned`, `CID`, `ValidateSupersession`
   - `RenderWithCompliance` (strict output compliance gate)
 
 - Package `xdao.co/catf/tpdl`
