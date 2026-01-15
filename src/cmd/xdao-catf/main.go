@@ -469,7 +469,7 @@ func cmdAttest(args []string, out io.Writer, errOut io.Writer) int {
 		return 1
 	}
 
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), priv)
+	doc.Crypto["Signature"] = keys.SignEd25519SHA256(parsed.SignedBytes(), priv)
 	finalBytes, err := catf.Render(doc)
 	if err != nil {
 		fmt.Fprintf(errOut, "render final: %v\n", err)

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"xdao.co/catf/catf"
+	"xdao.co/catf/keys"
 )
 
 type multiStringFlag []string
@@ -76,7 +77,7 @@ func main() {
 	if err != nil {
 		fatalf("catf.Parse(pre): %v", err)
 	}
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), priv)
+	doc.Crypto["Signature"] = keys.SignEd25519SHA256(parsed.SignedBytes(), priv)
 	out, err := catf.Render(doc)
 	if err != nil {
 		fatalf("catf.Render(final): %v", err)

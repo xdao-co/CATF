@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"strings"
 	"testing"
+
+	"xdao.co/catf/keys"
 )
 
 func mustKeypair(t *testing.T, seedByte byte) (ed25519.PublicKey, ed25519.PrivateKey) {
@@ -47,7 +49,7 @@ func validCATFBytes(t *testing.T) []byte {
 		t.Fatalf("parse pre: %v", err)
 	}
 
-	doc.Crypto["Signature"] = SignEd25519SHA256(parsed.SignedBytes(), priv)
+	doc.Crypto["Signature"] = keys.SignEd25519SHA256(parsed.SignedBytes(), priv)
 	out, err := Render(doc)
 	if err != nil {
 		t.Fatalf("render: %v", err)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"xdao.co/catf/catf"
+	"xdao.co/catf/keys"
 )
 
 // ----- test helpers -----
@@ -100,7 +101,7 @@ func mustAttestation(t *testing.T, subjectCID, description string, claims map[st
 	if err != nil {
 		t.Fatalf("parse pre: %v", err)
 	}
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), priv)
+	doc.Crypto["Signature"] = keys.SignEd25519SHA256(parsed.SignedBytes(), priv)
 	out, err := catf.Render(doc)
 	if err != nil {
 		t.Fatalf("render: %v", err)

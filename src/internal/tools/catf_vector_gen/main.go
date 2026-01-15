@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"xdao.co/catf/catf"
+	"xdao.co/catf/keys"
 )
 
 func mustKeypair(seedByte byte) (ed25519.PublicKey, ed25519.PrivateKey) {
@@ -44,7 +45,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), priv)
+	doc.Crypto["Signature"] = keys.SignEd25519SHA256(parsed.SignedBytes(), priv)
 
 	finalBytes, err := catf.Render(doc)
 	if err != nil {

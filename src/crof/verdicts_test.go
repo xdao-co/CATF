@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"xdao.co/catf/catf"
+	"xdao.co/catf/keys"
 	"xdao.co/catf/resolver"
 )
 
@@ -42,7 +43,7 @@ func attestationBytes(t *testing.T, subjectCID, description string, claims map[s
 	if err != nil {
 		t.Fatalf("Parse pre: %v", err)
 	}
-	doc.Crypto["Signature"] = catf.SignEd25519SHA256(parsed.SignedBytes(), signingKey)
+	doc.Crypto["Signature"] = keys.SignEd25519SHA256(parsed.SignedBytes(), signingKey)
 	out, err := catf.Render(doc)
 	if err != nil {
 		t.Fatalf("Render final: %v", err)

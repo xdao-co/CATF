@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"io"
 	"testing"
+
+	"xdao.co/catf/keys"
 )
 
 type deterministicReader struct{}
@@ -16,7 +18,7 @@ func (deterministicReader) Read(p []byte) (int, error) {
 }
 
 func TestCATF_Verify_Dilithium3_SHA3_256(t *testing.T) {
-	pk, sk, err := GenerateDilithium3Keypair(io.Reader(deterministicReader{}))
+	pk, sk, err := keys.GenerateDilithium3Keypair(io.Reader(deterministicReader{}))
 	if err != nil {
 		t.Fatalf("GenerateDilithium3Keypair: %v", err)
 	}
@@ -44,7 +46,7 @@ func TestCATF_Verify_Dilithium3_SHA3_256(t *testing.T) {
 		t.Fatalf("Parse pre: %v", err)
 	}
 
-	sig, err := SignDilithium3(parsed.SignedBytes(), "sha3-256", sk)
+	sig, err := keys.SignDilithium3(parsed.SignedBytes(), "sha3-256", sk)
 	if err != nil {
 		t.Fatalf("SignDilithium3: %v", err)
 	}
