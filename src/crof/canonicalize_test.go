@@ -170,3 +170,137 @@ func TestCanonicalizeCROF_RejectsEmptyInput(t *testing.T) {
 		t.Fatalf("expected CanonicalizeCROF error")
 	}
 }
+
+func TestCanonicalizeCROF_RejectsExclusionsMissingReason(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID:     "bafy-doc-1",
+		State:          resolver.StateResolved,
+		Confidence:     resolver.ConfidenceHigh,
+		Exclusions:     []resolver.Exclusion{{CID: "bafy-a1", Reason: "EXCLUSION-REASON-1"}},
+		Verdicts:       []resolver.Verdict{{CID: "bafy-a1", Trusted: true, Revoked: false}},
+		PolicyVerdicts: nil,
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text, "Reason: EXCLUSION-REASON-1\n\nVERDICTS\n", "\n\nVERDICTS\n", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsExclusionsDuplicateAttestationCID(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Exclusions: []resolver.Exclusion{{CID: "bafy-a1", Reason: "EXCLUSION-REASON-2"}},
+		Verdicts:   []resolver.Verdict{{CID: "bafy-a1", Trusted: true, Revoked: false}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text,
+		"EXCLUSIONS\nAttestation-CID: bafy-a1\n",
+		"EXCLUSIONS\nAttestation-CID: bafy-a1\nAttestation-CID: bafy-a1\n",
+		1,
+	))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsExclusionsDuplicateInputHash(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Exclusions: []resolver.Exclusion{{InputHash: "sha256:aa", Reason: "EXCLUSION-REASON-3"}},
+		Verdicts:   []resolver.Verdict{{InputHash: "sha256:aa", Trusted: false, Revoked: false, ExcludedReason: "EXCLUSION-REASON-3"}},
+	}
+	b := Render(res, "bafy-policy", []string{"sha256:aa"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text,
+		"EXCLUSIONS\nInput-Hash: sha256:aa\n",
+		"EXCLUSIONS\nInput-Hash: sha256:aa\nInput-Hash: sha256:aa\n",
+		1,
+	))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsVerdictsMissingTrusted(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Verdicts:   []resolver.Verdict{{CID: "bafy-a1", Trusted: true, Revoked: false}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text, "Trusted: true\n", "", 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsVerdictsDuplicateAttestationCID(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Verdicts:   []resolver.Verdict{{CID: "bafy-a1", Trusted: true, Revoked: false}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text,
+		"VERDICTS\nAttestation-CID: bafy-a1\n",
+		"VERDICTS\nAttestation-CID: bafy-a1\nAttestation-CID: bafy-a1\n",
+		1,
+	))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsVerdictsRecordNotStartingWithCIDOrHash(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		Verdicts:   []resolver.Verdict{{CID: "bafy-a1", Trusted: true, Revoked: false}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	bad := []byte(strings.Replace(text,
+		"VERDICTS\nAttestation-CID: bafy-a1\nTrusted: true\n",
+		"VERDICTS\nTrusted: true\nAttestation-CID: bafy-a1\n",
+		1,
+	))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
