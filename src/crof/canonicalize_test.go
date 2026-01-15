@@ -697,3 +697,134 @@ func TestCanonicalizeCROF_RejectsResultMalformedPolicyVerdictLine(t *testing.T) 
 		t.Fatalf("expected CanonicalizeCROF error")
 	}
 }
+
+func TestCanonicalizeCROF_RejectsResultMalformedPolicyIssuerKey_MissingField(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		PolicyVerdicts: []resolver.PolicyVerdict{{
+			Type:       "authorship",
+			Role:       "author",
+			Quorum:     1,
+			Observed:   1,
+			Satisfied:  true,
+			IssuerKeys: []string{"ed25519:aaa"},
+		}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+	if _, err := CanonicalizeCROF(b); err != nil {
+		t.Fatalf("expected canonical output, got: %v", err)
+	}
+
+	text := string(b)
+	idx := strings.Index(text, "Policy-Issuer-Key: ")
+	if idx < 0 {
+		t.Fatalf("missing Policy-Issuer-Key line")
+	}
+	end := strings.Index(text[idx:], "\n")
+	if end < 0 {
+		t.Fatalf("malformed output")
+	}
+	end = idx + end + 1
+	line := text[idx:end]
+	// Remove one required field.
+	mut := strings.Replace(line, "; Issuer-Key=", "; ", 1)
+	if mut == line {
+		t.Fatalf("failed to mutate policy issuer key line")
+	}
+	bad := []byte(text[:idx] + mut + text[end:])
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultMalformedPolicyIssuerKey_UnknownField(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		PolicyVerdicts: []resolver.PolicyVerdict{{
+			Type:       "authorship",
+			Role:       "author",
+			Quorum:     1,
+			Observed:   1,
+			Satisfied:  true,
+			IssuerKeys: []string{"ed25519:bbb"},
+		}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+	if _, err := CanonicalizeCROF(b); err != nil {
+		t.Fatalf("expected canonical output, got: %v", err)
+	}
+
+	text := string(b)
+	idx := strings.Index(text, "Policy-Issuer-Key: ")
+	if idx < 0 {
+		t.Fatalf("missing Policy-Issuer-Key line")
+	}
+	end := strings.Index(text[idx:], "\n")
+	if end < 0 {
+		t.Fatalf("malformed output")
+	}
+	end = idx + end + 1
+	line := text[idx:end]
+	mut := strings.Replace(line, "Issuer-Key=", "Bogus=", 1)
+	if mut == line {
+		t.Fatalf("failed to mutate policy issuer key line")
+	}
+	bad := []byte(text[:idx] + mut + text[end:])
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultMalformedPolicyIssuerKey_DuplicateField(t *testing.T) {
+	res := &resolver.Resolution{
+		SubjectCID: "bafy-doc-1",
+		State:      resolver.StateResolved,
+		Confidence: resolver.ConfidenceHigh,
+		PolicyVerdicts: []resolver.PolicyVerdict{{
+			Type:       "authorship",
+			Role:       "author",
+			Quorum:     1,
+			Observed:   1,
+			Satisfied:  true,
+			IssuerKeys: []string{"ed25519:ccc"},
+		}},
+	}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+	if _, err := CanonicalizeCROF(b); err != nil {
+		t.Fatalf("expected canonical output, got: %v", err)
+	}
+
+	text := string(b)
+	idx := strings.Index(text, "Policy-Issuer-Key: ")
+	if idx < 0 {
+		t.Fatalf("missing Policy-Issuer-Key line")
+	}
+	end := strings.Index(text[idx:], "\n")
+	if end < 0 {
+		t.Fatalf("malformed output")
+	}
+	end = idx + end + 1
+	line := text[idx:end]
+	// Duplicate an existing field.
+	ins := strings.Replace(line, "Type=", "Type=authorship; Type=", 1)
+	if ins == line {
+		t.Fatalf("failed to mutate policy issuer key line")
+	}
+	bad := []byte(text[:idx] + ins + text[end:])
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
