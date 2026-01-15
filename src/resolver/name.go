@@ -38,6 +38,10 @@ func ResolveName(attestationBytes [][]byte, policyBytes []byte, name, version st
 	if err != nil {
 		return nil, err
 	}
+	return resolveNameWithPolicy(attestationBytes, policy, name, version)
+}
+
+func resolveNameWithPolicy(attestationBytes [][]byte, policy *tpdl.Policy, name, version string) (*NameResolution, error) {
 	trustIndex := indexTrust(policy)
 
 	var atts []*attestation

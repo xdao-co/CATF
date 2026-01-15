@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"xdao.co/catf/compliance"
 )
 
 type Policy struct {
@@ -28,6 +30,65 @@ type Rule struct {
 	Type   string
 	Role   string
 	Quorum int
+}
+
+// ParseWithCompliance parses a TPDL policy and optionally enforces additional
+// compliance-mode constraints.
+//
+// In compliance.Strict mode, this enforces "no defaults": every Require block
+// must include an explicit Quorum field.
+func ParseWithCompliance(data []byte, mode compliance.ComplianceMode) (*Policy, error) {
+	p, err := Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	if mode == compliance.Strict {
+		if err := enforceStrictTPDL(data); err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
+}
+
+// ParseStrict is a convenience wrapper for ParseWithCompliance(..., compliance.Strict).
+func ParseStrict(data []byte) (*Policy, error) {
+	return ParseWithCompliance(data, compliance.Strict)
+}
+
+func enforceStrictTPDL(data []byte) error {
+	lines := strings.Split(string(data), "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	stripIndent := func(s string) string {
+		return strings.TrimLeft(s, " \t")
+	}
+
+	for i := 0; i < len(lines); i++ {
+		if lines[i] != "Require:" {
+			continue
+		}
+		hasQuorum := false
+		for j := i + 1; j < len(lines); j++ {
+			l := lines[j]
+			if l == "" {
+				break
+			}
+			if l == "Require:" || l == "Supersedes:" || l == "META" || l == "TRUST" || l == "RULES" || strings.HasPrefix(l, "-----END ") {
+				break
+			}
+			l = stripIndent(l)
+			if strings.HasPrefix(l, "Quorum: ") {
+				hasQuorum = true
+				break
+			}
+		}
+		if !hasQuorum {
+			return errors.New("strict mode: Require block missing Quorum")
+		}
+	}
+	return nil
 }
 
 // Parse parses a TPDL policy from bytes.

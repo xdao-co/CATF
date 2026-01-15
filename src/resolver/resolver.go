@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"xdao.co/catf/catf"
+	"xdao.co/catf/compliance"
 	"xdao.co/catf/tpdl"
 )
 
@@ -120,10 +121,14 @@ func inputHash(b []byte) string {
 // This v1 reference resolver supports the spec's reference test vectors:
 // authorship, approval, supersedes, revocation.
 func Resolve(attestationBytes [][]byte, policyBytes []byte, subjectCID string) (*Resolution, error) {
-	policy, err := tpdl.Parse(policyBytes)
+	policy, err := tpdl.ParseWithCompliance(policyBytes, compliance.Permissive)
 	if err != nil {
 		return nil, err
 	}
+	return resolveWithPolicy(attestationBytes, policy, subjectCID)
+}
+
+func resolveWithPolicy(attestationBytes [][]byte, policy *tpdl.Policy, subjectCID string) (*Resolution, error) {
 	trustIndex := indexTrust(policy)
 
 	var atts []*attestation

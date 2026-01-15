@@ -1,6 +1,9 @@
 package resolver
 
-import "xdao.co/catf/compliance"
+import (
+	"xdao.co/catf/compliance"
+	"xdao.co/catf/tpdl"
+)
 
 // ResolveWithOptions runs Resolve and then applies the requested compliance mode.
 //
@@ -8,7 +11,11 @@ import "xdao.co/catf/compliance"
 // keep its behavior stable while giving callers an explicit knob.
 func ResolveWithOptions(attestationBytes [][]byte, policyBytes []byte, subjectCID string, opts Options) (*Resolution, error) {
 	opts = opts.withDefaults()
-	res, err := Resolve(attestationBytes, policyBytes, subjectCID)
+	policy, err := tpdl.ParseWithCompliance(policyBytes, opts.Mode)
+	if err != nil {
+		return nil, err
+	}
+	res, err := resolveWithPolicy(attestationBytes, policy, subjectCID)
 	if err != nil {
 		return nil, err
 	}
@@ -23,7 +30,11 @@ func ResolveWithOptions(attestationBytes [][]byte, policyBytes []byte, subjectCI
 // ResolveNameWithOptions runs ResolveName and then applies the requested compliance mode.
 func ResolveNameWithOptions(attestationBytes [][]byte, policyBytes []byte, name, version string, opts Options) (*NameResolution, error) {
 	opts = opts.withDefaults()
-	res, err := ResolveName(attestationBytes, policyBytes, name, version)
+	policy, err := tpdl.ParseWithCompliance(policyBytes, opts.Mode)
+	if err != nil {
+		return nil, err
+	}
+	res, err := resolveNameWithPolicy(attestationBytes, policy, name, version)
 	if err != nil {
 		return nil, err
 	}

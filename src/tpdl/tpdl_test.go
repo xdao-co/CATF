@@ -2,6 +2,8 @@ package tpdl
 
 import (
 	"testing"
+
+	"xdao.co/catf/compliance"
 )
 
 const validTPDL = `-----BEGIN XDAO TRUST POLICY-----
@@ -57,6 +59,46 @@ Require:
 	}
 	if len(policy.Rules) != 1 || policy.Rules[0].Quorum != 3 {
 		t.Fatalf("expected quorum=3, got %+v", policy.Rules)
+	}
+}
+
+func TestParseStrictTPDL_RequiresExplicitQuorum(t *testing.T) {
+	// This policy omits Quorum; Parse() defaults it to 1, but strict parsing must reject.
+	policy, err := Parse([]byte(validTPDL))
+	if err != nil {
+		t.Fatalf("Parse(validTPDL): %v", err)
+	}
+	if len(policy.Rules) != 1 || policy.Rules[0].Quorum != 1 {
+		t.Fatalf("expected default quorum=1, got %+v", policy.Rules)
+	}
+
+	if _, err := ParseStrict([]byte(validTPDL)); err == nil {
+		t.Fatalf("expected strict parse error")
+	}
+	if _, err := ParseWithCompliance([]byte(validTPDL), compliance.Strict); err == nil {
+		t.Fatalf("expected strict parse error")
+	}
+}
+
+func TestParseStrictTPDL_AllowsExplicitQuorumOne(t *testing.T) {
+	policyText := `-----BEGIN XDAO TRUST POLICY-----
+META
+Version: 1
+Spec: xdao-tpdl-1
+
+TRUST
+Key: ed25519:K1
+Role: author
+
+RULES
+Require:
+  Type: authorship
+  Role: author
+  Quorum: 1
+-----END XDAO TRUST POLICY-----`
+
+	if _, err := ParseStrict([]byte(policyText)); err != nil {
+		t.Fatalf("expected strict parse ok, got %v", err)
 	}
 }
 

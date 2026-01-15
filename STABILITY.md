@@ -18,8 +18,13 @@ The Go module follows Semantic Versioning (SemVer): `MAJOR.MINOR.PATCH`.
 Stable APIs are intended for long-term, multi-language reimplementation and SHOULD NOT change without a MAJOR version bump.
 
 - Package `xdao.co/catf/catf`
+  - Types (treat struct fields as read-only; prefer methods)
+    - `CATF`, `Section`
+    - `Document` (for canonical construction)
   - `Parse([]byte) (*CATF, error)` (parses canonical CATF; rejects non-canonical bytes)
   - `CanonicalizeCATF([]byte) ([]byte, error)`
+  - `Render(Document) ([]byte, error)` (produces canonical CATF bytes)
+  - `SectionOrder` (informational; canonical order)
   - `ValidateCoreClaims(*CATF) error` (rule-ID-driven)
   - `(*CATF).CanonicalBytes() []byte`
   - `(*CATF).SignedBytes() []byte`
@@ -31,13 +36,22 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
   - `Resolve(attestations, policy, subjectCID)`
   - `ResolveStrict(attestations, policy, subjectCID)`
   - `ResolveName(attestations, policy, name, version)`
+  - Types
+    - `Options`
+    - `Resolution`, `Path`, `Fork`, `Exclusion`, `Verdict`, `PolicyVerdict`
+    - `NameResolution`, `NameFork`
 
 - Package `xdao.co/catf/crof`
   - `Render`, `RenderSigned`, `CID`, `ValidateSupersession`
   - `RenderWithCompliance` (strict output compliance gate)
+  - Types
+    - `RenderOptions`
 
 - Package `xdao.co/catf/tpdl`
-  - `Parse([]byte) (*Policy, error)` and policy model types
+  - `Parse([]byte) (*Policy, error)`
+  - `ParseWithCompliance([]byte, compliance.ComplianceMode) (*Policy, error)`
+  - `ParseStrict([]byte) (*Policy, error)`
+  - Policy model types
 
 - Package `xdao.co/catf/cidutil`
   - `CIDv1RawSHA256([]byte) string`
@@ -57,6 +71,11 @@ They should be used with pinning and explicit upgrade review.
 
 - Package `xdao.co/catf/catf`
   - `NormalizeCATF([]byte) ([]byte, error)` (model-first canonicalization helper)
+
+  - Convenience crypto helpers (message signing primitives; not protocol-specific)
+    - `SignEd25519SHA256([]byte, ed25519.PrivateKey) string`
+    - `SignDilithium3([]byte, string, *mode3.PrivateKey) (string, error)`
+    - `GenerateDilithium3Keypair(io.Reader) (*mode3.PublicKey, *mode3.PrivateKey, error)`
 
 - Package `xdao.co/catf/keys`
   - Filesystem-backed key storage and convenience helpers (`KeyStore`, `CreateKeyStore`, etc.)
