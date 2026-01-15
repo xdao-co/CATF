@@ -225,12 +225,27 @@ func validateResult(body []string) error {
 	}
 	need := map[string]bool{"Subject-CID": false, "Confidence": false, "State": false}
 	for _, l := range body {
-		k, _, err := validateKVLine(l)
+		k, v, err := validateKVLine(l)
 		if err != nil {
 			return fmt.Errorf("RESULT: %w", err)
 		}
-		if _, ok := need[k]; ok {
+		switch k {
+		case "Subject-CID", "Confidence", "State":
 			need[k] = true
+		case "Policy-Verdict":
+			if err := validatePolicyVerdictValue(v); err != nil {
+				return fmt.Errorf("RESULT: %w", err)
+			}
+		case "Policy-Issuer-Key":
+			if err := validatePolicyIssuerKeyValue(v); err != nil {
+				return fmt.Errorf("RESULT: %w", err)
+			}
+		case "Policy-Verdict-Reason":
+			if err := validatePolicyVerdictReasonValue(v); err != nil {
+				return fmt.Errorf("RESULT: %w", err)
+			}
+		default:
+			return fmt.Errorf("RESULT: unknown key %q", k)
 		}
 	}
 	for k, ok := range need {
@@ -239,6 +254,91 @@ func validateResult(body []string) error {
 		}
 	}
 	return nil
+}
+
+func validatePolicyKVParts(value string, requiredKeys map[string]func(string) error) error {
+	parts := strings.Split(value, "; ")
+	seen := make(map[string]bool, len(parts))
+	for _, p := range parts {
+		if p == "" {
+			return errors.New("empty policy field")
+		}
+		k, v, ok := strings.Cut(p, "=")
+		if !ok {
+			return errors.New("invalid policy field formatting")
+		}
+		if k == "" {
+			return errors.New("empty policy field key")
+		}
+		if v == "" {
+			return errors.New("empty policy field value")
+		}
+		if seen[k] {
+			return errors.New("duplicate policy field")
+		}
+		seen[k] = true
+		check, ok := requiredKeys[k]
+		if !ok {
+			return fmt.Errorf("unknown policy field %q", k)
+		}
+		if err := check(v); err != nil {
+			return err
+		}
+	}
+	for k := range requiredKeys {
+		if !seen[k] {
+			return fmt.Errorf("missing policy field %q", k)
+		}
+	}
+	return nil
+}
+
+func validatePolicyVerdictValue(value string) error {
+	required := map[string]func(string) error{
+		"Type": func(v string) error { return nil },
+		"Role": func(v string) error { return nil },
+		"Quorum": func(v string) error {
+			for _, r := range v {
+				if r < '0' || r > '9' {
+					return errors.New("invalid Quorum")
+				}
+			}
+			return nil
+		},
+		"Observed": func(v string) error {
+			for _, r := range v {
+				if r < '0' || r > '9' {
+					return errors.New("invalid Observed")
+				}
+			}
+			return nil
+		},
+		"Satisfied": func(v string) error {
+			if v != "true" && v != "false" {
+				return errors.New("invalid Satisfied")
+			}
+			return nil
+		},
+	}
+	return validatePolicyKVParts(value, required)
+}
+
+func validatePolicyIssuerKeyValue(value string) error {
+	required := map[string]func(string) error{
+		"Type":       func(v string) error { return nil },
+		"Role":       func(v string) error { return nil },
+		"Issuer-Key": func(v string) error { return nil },
+	}
+	return validatePolicyKVParts(value, required)
+}
+
+func validatePolicyVerdictReasonValue(value string) error {
+	required := map[string]func(string) error{
+		"Type":   func(v string) error { return nil },
+		"Role":   func(v string) error { return nil },
+		"Reason": func(v string) error { return nil },
+	}
+	return validatePolicyKVParts(value, required)
 }
 
 func validatePaths(body []string) error {
