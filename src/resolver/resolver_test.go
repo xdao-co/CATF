@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -122,24 +123,45 @@ func TestResolve_SupersedesCompetingHeadsSurfaceFork(t *testing.T) {
 		"Supersedes": baseCID,
 		"Type":       "supersedes",
 	}, issuerC, privC)
+	s1CID := catfMustCID(t, s1)
+	s2CID := catfMustCID(t, s2)
+	minHead, maxHead := s1CID, s2CID
+	if minHead > maxHead {
+		minHead, maxHead = maxHead, minHead
+	}
 
 	policy := trustPolicy(
 		[]trustEntry{{issuerA, "author"}, {issuerB, "editor"}, {issuerC, "editor"}},
 		nil,
 	)
 
-	res, err := Resolve([][]byte{base, s1, s2}, []byte(policy), subject)
-	if err != nil {
-		t.Fatalf("Resolve error: %v", err)
+	expectPaths := []Path{
+		{ID: "path-1", CIDs: []string{minHead, baseCID}},
+		{ID: "path-2", CIDs: []string{maxHead, baseCID}},
 	}
-	if res.State != StateForked {
-		t.Fatalf("expected Forked, got %s", res.State)
-	}
-	if len(res.Paths) != 2 {
-		t.Fatalf("expected 2 paths, got %d", len(res.Paths))
-	}
-	if len(res.Forks) != 1 {
-		t.Fatalf("expected 1 fork, got %d", len(res.Forks))
+	expectForks := []Fork{{ID: "fork-1", ConflictingPath: []string{"path-1", "path-2"}}}
+
+	inputs := [][]byte{base, s1, s2}
+	for run := 0; run < 25; run++ {
+		for _, p := range permuteIndices(len(inputs)) {
+			var ordered [][]byte
+			for _, i := range p {
+				ordered = append(ordered, inputs[i])
+			}
+			res, err := Resolve(ordered, []byte(policy), subject)
+			if err != nil {
+				t.Fatalf("Resolve error: %v", err)
+			}
+			if res.State != StateForked {
+				t.Fatalf("expected Forked, got %s", res.State)
+			}
+			if !reflect.DeepEqual(res.Paths, expectPaths) {
+				t.Fatalf("paths not stable/deterministic: got=%+v want=%+v", res.Paths, expectPaths)
+			}
+			if !reflect.DeepEqual(res.Forks, expectForks) {
+				t.Fatalf("forks not stable/deterministic: got=%+v want=%+v", res.Forks, expectForks)
+			}
+		}
 	}
 }
 
