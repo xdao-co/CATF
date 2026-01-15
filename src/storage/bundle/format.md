@@ -95,19 +95,19 @@ Suggested schema (stable, but still draft):
   "blocks": [
     {"cid": "bafy...", "size": 1234}
   ],
-  "labels": {
-    "subject": "bafy...",
-    "policy": "bafy...",
-    "attestations/0": "bafy..."
-  }
+  "labels": [
+    {"name": "subject", "cid": "bafy..."},
+    {"name": "policy", "cid": "bafy..."},
+    {"name": "attestations/0", "cid": "bafy..."}
+  ]
 }
 ```
 
 If present, `index.json` MUST be UTF-8 and MUST be canonical JSON:
 
 - No insignificant whitespace
-- Object keys sorted lexicographically
-- Arrays in deterministic order
+- Object keys sorted lexicographically (as emitted by the implementation)
+- Arrays in deterministic order (blocks sorted by CID; labels sorted by name)
 
 (If/when we implement this, we should reuse the same canonical JSON routine used elsewhere in CATF.)
 

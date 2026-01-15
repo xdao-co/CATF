@@ -218,8 +218,8 @@ This becomes your “Library of Alexandria” mechanism.
 
 Deliverable (suggested):
 
-- `src/storage/bundle/format.md` (spec added)
-- `src/storage/bundle/*` implementation
+- `src/storage/bundle/format.md` (spec)
+- `src/storage/bundle/*` implementation (export/import + determinism tests)
 
 ---
 
