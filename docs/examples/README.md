@@ -2,6 +2,12 @@
 
 These scripts exercise the repo end-to-end (CATF → TPDL → Resolver → CROF) using the minimal CLI.
 
+## Full process walkthrough
+
+If you want a single, reproducible demo of the entire lifecycle (subject → attestations → policy → resolve → CROF) **and** you want all artifacts stored in a CAS, start here:
+
+- [docs/Walkthrough_Storage.md](docs/Walkthrough_Storage.md)
+
 ## Walkthrough: store everything in a CAS
 
 These walkthroughs explicitly store **all artifacts** (subject bytes, trust policy, attestations, and CROF output) into a content-addressable store, then resolve using only CIDs.
