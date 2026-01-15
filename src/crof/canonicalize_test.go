@@ -417,3 +417,125 @@ func TestCanonicalizeCROF_RejectsUnsortedConflictingPaths(t *testing.T) {
 		t.Fatalf("expected CanonicalizeCROF error")
 	}
 }
+
+func TestCanonicalizeCROF_RejectsResultMissingSubjectCID(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	start := strings.Index(text, "Subject-CID: ")
+	if start < 0 {
+		t.Fatalf("missing Subject-CID line in rendered CROF")
+	}
+	end := strings.Index(text[start:], "\n")
+	if end < 0 {
+		t.Fatalf("missing newline after Subject-CID line")
+	}
+	end = start + end + 1
+	bad := []byte(text[:start] + text[end:])
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultMissingConfidence(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	start := strings.Index(text, "Confidence: ")
+	if start < 0 {
+		t.Fatalf("missing Confidence line in rendered CROF")
+	}
+	end := strings.Index(text[start:], "\n")
+	if end < 0 {
+		t.Fatalf("missing newline after Confidence line")
+	}
+	end = start + end + 1
+	bad := []byte(text[:start] + text[end:])
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultMissingState(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	start := strings.Index(text, "State: ")
+	if start < 0 {
+		t.Fatalf("missing State line in rendered CROF")
+	}
+	end := strings.Index(text[start:], "\n")
+	if end < 0 {
+		t.Fatalf("missing newline after State line")
+	}
+	end = start + end + 1
+	bad := []byte(text[:start] + text[end:])
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultInvalidKVFormatting(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	start := strings.Index(text, "State: ")
+	if start < 0 {
+		t.Fatalf("missing State line in rendered CROF")
+	}
+	end := strings.Index(text[start:], "\n")
+	if end < 0 {
+		t.Fatalf("missing newline after State line")
+	}
+	end = start + end + 1
+	line := text[start:end]
+	mutated := strings.Replace(line, ": ", " ", 1)
+	if mutated == line {
+		t.Fatalf("failed to mutate key-value formatting")
+	}
+	bad := []byte(text[:start] + mutated + text[end:])
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
+
+func TestCanonicalizeCROF_RejectsResultDuplicateLine(t *testing.T) {
+	res := &resolver.Resolution{SubjectCID: "bafy-doc-1", State: resolver.StateResolved, Confidence: resolver.ConfidenceHigh}
+	b := Render(res, "bafy-policy", []string{"bafy-a1"}, RenderOptions{})
+
+	text := string(b)
+	start := strings.Index(text, "State: ")
+	if start < 0 {
+		t.Fatalf("missing State line in rendered CROF")
+	}
+	end := strings.Index(text[start:], "\n")
+	if end < 0 {
+		t.Fatalf("missing newline after State line")
+	}
+	end = start + end + 1
+	line := text[start:end]
+	// Duplicate an existing RESULT line; validateSortedStrict should reject duplicates.
+	bad := []byte(strings.Replace(text, line, line+line, 1))
+	if bytes.Equal(b, bad) {
+		t.Fatalf("failed to mutate CROF bytes")
+	}
+	if _, err := CanonicalizeCROF(bad); err == nil {
+		t.Fatalf("expected CanonicalizeCROF error")
+	}
+}
