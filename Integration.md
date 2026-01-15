@@ -255,7 +255,7 @@ Note: `catf.SignEd25519SHA256` (and related helpers) are deprecated; prefer the 
 Crypto agility notes:
 
 - Supported `Crypto` fields include `Signature-Alg` (`ed25519`, `dilithium3`) and `Hash-Alg` (`sha256`, `sha512`, `sha3-256`).
-- For `Signature-Alg=dilithium3`, signatures are computed/verified over the digest bytes of `Signed`.
+- For `Signature-Alg=dilithium3`, signatures are computed/verified over the digest bytes of `SignedBytes()`.
 
 Operational guidance:
 
