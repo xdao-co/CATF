@@ -25,6 +25,8 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
   - `CanonicalizeCATF([]byte) ([]byte, error)`
   - `Render(Document) ([]byte, error)` (produces canonical CATF bytes)
   - `SectionOrder` (informational; canonical order)
+  - Format constants
+    - `Preamble`, `Postamble`
   - `ValidateCoreClaims(*CATF) error` (rule-ID-driven)
   - `(*CATF).CanonicalBytes() []byte`
   - `(*CATF).SignedBytes() []byte`
@@ -33,19 +35,28 @@ Stable APIs are intended for long-term, multi-language reimplementation and SHOU
   - Structured error type: `*catf.Error` (`Kind`, `RuleID`)
   - Error helpers
     - `Kind`
+    - `KindParse`, `KindCanonical`, `KindValidation`, `KindRender`, `KindCrypto`, `KindCID`, `KindInternal`
     - `IsKind(error, Kind) bool`
     - `RuleID(error) string`
 
 - Package `xdao.co/catf/resolver`
   - `Resolve(attestations, policy, subjectCID)`
+  - `ResolveWithOptions(attestations, policy, subjectCID, Options)`
   - `ResolveStrict(attestations, policy, subjectCID)`
   - `ResolveName(attestations, policy, name, version)`
+  - `ResolveNameWithOptions(attestations, policy, name, version, Options)`
   - Types
     - `Options`
     - `Resolution`, `Path`, `Fork`, `Exclusion`, `Verdict`, `PolicyVerdict`
     - `NameResolution`, `NameFork`
+    - `State` (`StateResolved`, `StateForked`, `StateUnresolved`, `StateRevoked`)
+    - `Confidence` (`ConfidenceHigh`, `ConfidenceMedium`, `ConfidenceLow`, `ConfidenceUndefined`)
+    - `VerdictStatus` (`VerdictTrusted`, `VerdictExcluded`, `VerdictInvalid`, `VerdictRevoked`, `VerdictUntrusted`)
 
 - Package `xdao.co/catf/crof`
+  - Format constants
+    - `Preamble`, `Postamble`
+  - `PolicyCID([]byte) string`
   - `Render`, `RenderSigned`, `RenderWithCID`
   - `CanonicalizeCROF([]byte) ([]byte, error)`
   - `CID`, `SupersedesCROFCID`, `ValidateSupersession`
