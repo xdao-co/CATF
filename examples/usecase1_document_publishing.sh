@@ -76,7 +76,7 @@ EOF
 
   GRPC_ADDR=""
   for _ in $(seq 1 100); do
-    GRPC_ADDR="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$IPFS_DAEMON_LOG" | head -n 1)"
+    GRPC_ADDR="$(sed -n 's/^.* listening on \(.*\) (backend=.*$/\1/p' "$IPFS_DAEMON_LOG" | head -n 1)"
     if [[ -n "$GRPC_ADDR" ]]; then
       break
     fi

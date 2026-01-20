@@ -1,4 +1,4 @@
-.PHONY: help all build build-cascli build-casgrpcd clean test test-unit test-integration fmt vet regen-conformance examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs walkthrough walkthrough-all walkthrough-localfs walkthrough-ipfs walkthrough-grpc walkthrough-grpc-localfs walkthrough-grpc-ipfs
+.PHONY: help all build build-cascli clean test test-unit test-integration fmt vet regen-conformance examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs walkthrough walkthrough-all walkthrough-localfs walkthrough-ipfs walkthrough-grpc walkthrough-grpc-localfs walkthrough-grpc-ipfs
 
 SHELL := /bin/bash
 
@@ -8,7 +8,6 @@ BIN_DIR := bin
 
 CATF_BIN := $(BIN_DIR)/xdao-catf
 CASCLI_BIN := $(BIN_DIR)/xdao-cascli
-CASGRPCD_BIN := $(BIN_DIR)/xdao-casgrpcd
 
 help:
 	@echo "Targets:"
@@ -48,9 +47,6 @@ build: $(BIN_DIR)
 
 build-cascli: $(BIN_DIR)
 	$(GO) -C "$(SRC_DIR)" build -o "../$(CASCLI_BIN)" ./internal/tools/cascli
-
-build-casgrpcd: $(BIN_DIR)
-	$(GO) -C "$(SRC_DIR)" build -o "../$(CASGRPCD_BIN)" ./cmd/xdao-casgrpcd
 
 clean:
 	@rm -rf "$(BIN_DIR)"

@@ -127,7 +127,7 @@ GRPC_PID_LOCALFS=$!
 GRPC_PID_IPFS=$!
 
 for _ in $(seq 1 100); do
-  GRPC_ADDR_LOCALFS="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG_LOCALFS" | head -n 1)"
+  GRPC_ADDR_LOCALFS="$(sed -n 's/^.* listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG_LOCALFS" | head -n 1)"
   if [[ -n "$GRPC_ADDR_LOCALFS" ]]; then
     break
   fi
@@ -135,7 +135,7 @@ for _ in $(seq 1 100); do
 done
 
 for _ in $(seq 1 100); do
-  GRPC_ADDR_IPFS="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG_IPFS" | head -n 1)"
+  GRPC_ADDR_IPFS="$(sed -n 's/^.* listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG_IPFS" | head -n 1)"
   if [[ -n "$GRPC_ADDR_IPFS" ]]; then
     break
   fi

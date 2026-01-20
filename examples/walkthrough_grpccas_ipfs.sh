@@ -95,7 +95,7 @@ echo "CAS config: $CAS_CONFIG" >&2
 GRPC_PID=$!
 
 for _ in $(seq 1 100); do
-  GRPC_ADDR="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG" | head -n 1)"
+  GRPC_ADDR="$(sed -n 's/^.* listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG" | head -n 1)"
   if [[ -n "$GRPC_ADDR" ]]; then
     break
   fi
