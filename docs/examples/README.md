@@ -32,7 +32,7 @@ These variants run the same “store everything in a CAS” lifecycle, but route
 
 This is a reference way to demonstrate “CAS compliant storage” over a network boundary:
 
-- A backend CAS implementation is exposed via `./bin/xdao-casgrpcd`
+- A backend CAS implementation is exposed via `./bin/xdao-casgrpcd` (or via the downloadable plugin daemons `xdao-casgrpcd-localfs` / `xdao-casgrpcd-ipfs`)
 - The client side uses `./bin/xdao-cascli --backend grpc --grpc-target ...`
 
 LocalFS backend via gRPC:

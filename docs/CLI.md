@@ -138,6 +138,13 @@ Install the latest release for your platform:
 ./bin/xdao-cascli plugin install --plugin ipfs
 ```
 
+List supported plugins (and optionally check the latest release assets for your OS/arch):
+
+```sh
+./bin/xdao-cascli plugin list
+./bin/xdao-cascli plugin list --with-latest
+```
+
 Install a specific version and/or target platform:
 
 ```sh
@@ -150,6 +157,18 @@ Once installed, run the daemon and use the `grpc` backend:
 xdao-casgrpcd-localfs --listen 127.0.0.1:7777 --backend localfs --localfs-dir /tmp/cas
 ./bin/xdao-cascli put --backend grpc --grpc-target 127.0.0.1:7777 ./examples/whitepaper.txt
 ```
+
+Verify an installed daemon matches a specific release artifact:
+
+```sh
+./bin/xdao-cascli plugin verify --plugin localfs --version v1.0.1
+```
+
+Notes:
+
+- The default install directory is `~/.local/bin`. If the installed daemon is not found, ensure it is on your `PATH`.
+- If you hit GitHub API rate limits, set `GITHUB_TOKEN` (or pass `--github-token`).
+- The IPFS plugin daemon requires Kubo `ipfs` to be installed and available on `PATH`.
 
 To store bytes into a local IPFS repo (no daemon required), use the IPFS CAS plugin:
 

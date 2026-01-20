@@ -56,6 +56,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  cascli plugin install --plugin localfs|ipfs [--version vX.Y.Z] [--install-dir <dir>] [--os <goos>] [--arch <goarch>]")
+	fmt.Fprintln(w, "  cascli plugin list [--plugin <name>] [--with-latest] [--os <goos>] [--arch <goarch>] [--json]")
+	fmt.Fprintln(w, "  cascli plugin verify --plugin localfs|ipfs [--version vX.Y.Z] [--install-dir <dir> | --binary-path <path>] [--os <goos>] [--arch <goarch>]")
 	fmt.Fprintln(w, "  cascli put --backend localfs --localfs-dir <dir> <file>")
 	fmt.Fprintln(w, "  cascli put --cas-config <file.json> [--backend <preferred>] [--emit-backend-cids] <file>")
 	fmt.Fprintln(w, "  cascli get --backend localfs --localfs-dir <dir> --cid <cid> [--out <file>]")

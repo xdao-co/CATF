@@ -74,6 +74,7 @@ It also ships an optional **CAS gRPC transport** layer that can expose any `stor
 
 - gRPC protocol + client/server adapters: `xdao.co/catf/storage/grpccas`
 - Reference daemon (wraps LocalFS or IPFS and serves gRPC): `./bin/xdao-casgrpcd`
+- Downloadable plugin daemons (no CATF recompile needed): `xdao-casgrpcd-localfs`, `xdao-casgrpcd-ipfs` (install via `./bin/xdao-cascli plugin install ...`)
 
 Design note:
 
@@ -133,6 +134,13 @@ make walkthrough-grpc-localfs
 ```
 
 This starts `xdao-casgrpcd` (LocalFS backend) and runs the standard “store everything” lifecycle through `xdao-cascli --backend grpc`.
+
+If you want the same daemon experience without building this repo, install and run the downloadable daemon instead:
+
+```sh
+./bin/xdao-cascli plugin install --plugin localfs
+xdao-casgrpcd-localfs --listen 127.0.0.1:7777 --backend localfs --localfs-dir /tmp/xdao-cas
+```
 
 #### Composing multiple providers (deterministic)
 

@@ -204,6 +204,13 @@ This repo includes a small reference daemon that exposes either LocalFS or IPFS 
 - binary: `./bin/xdao-casgrpcd`
 - source: `src/cmd/xdao-casgrpcd`
 
+If you want the same functionality without building this repo, you can install a downloadable daemon from GitHub Releases:
+
+```sh
+./bin/xdao-cascli plugin install --plugin localfs
+./bin/xdao-cascli plugin install --plugin ipfs
+```
+
 Example:
 
 ```sh
@@ -249,7 +256,7 @@ Because they implement the common interface, they are interchangeable in:
 - the resolver (Go integration)
 - the CAS gRPC server wrapper (`grpccas.Server`)
 - the CAS gRPC client wrapper (`grpccas.Client`)
-- CLI tooling (`xdao-cascli`, `xdao-casgrpcd`) by selecting the backend
+- CLI tooling (`xdao-cascli`, `xdao-casgrpcd`, and the downloadable `xdao-casgrpcd-localfs` / `xdao-casgrpcd-ipfs`) by selecting the backend
 
 ---
 

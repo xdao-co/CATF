@@ -180,6 +180,7 @@ They use:
 The gRPC variants additionally use:
 
 - `./bin/xdao-casgrpcd` to expose a CAS backend (LocalFS or IPFS) over the CAS gRPC protocol
+- Alternatively, you can install and run the downloadable plugin daemons (`xdao-casgrpcd-localfs`, `xdao-casgrpcd-ipfs`) via `./bin/xdao-cascli plugin install ...`
 - `xdao-cascli --backend grpc --grpc-target <host:port>` to exercise the exact same flow through the network boundary
 
 Internally, `xdao-cascli` performs the “resolve from CIDs” step via the public Go API:
