@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 
 	"xdao.co/catf/model"
 	"xdao.co/catf/storage"
+	"xdao.co/catf/storage/casconfig"
 	"xdao.co/catf/storage/casregistry"
 
 	_ "xdao.co/catf-ipfs/ipfs"
@@ -52,6 +54,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
 	fmt.Fprintln(w, "  cascli put --backend localfs --localfs-dir <dir> <file>")
+	fmt.Fprintln(w, "  cascli put --cas-config <file.json> [--backend <preferred>] [--emit-backend-cids] <file>")
 	fmt.Fprintln(w, "  cascli get --backend localfs --localfs-dir <dir> --cid <cid> [--out <file>]")
 	fmt.Fprintln(w, "  cascli resolve --backend localfs --localfs-dir <dir> --subject <cid> --policy <cid> --att <cid> [--att ...] [--mode strict|permissive]")
 	fmt.Fprintln(w, "  cascli put --backend grpc --grpc-target <host:port> <file>")
@@ -73,15 +76,24 @@ func printUsage(w io.Writer) {
 type commonFlags struct {
 	backend      string
 	listBackends bool
+	casConfig    string
 }
 
 func (c *commonFlags) add(fs *flag.FlagSet) {
 	fs.StringVar(&c.backend, "backend", "localfs", "CAS backend name")
 	fs.BoolVar(&c.listBackends, "list-backends", false, "List supported backends and exit")
+	fs.StringVar(&c.casConfig, "cas-config", "", "Path to CAS JSON config (optional; uses casregistry OpenWithConfig)")
 	casregistry.RegisterFlags(fs, casregistry.UsageCLI)
 }
 
 func (c *commonFlags) openCAS() (storage.CAS, func() error, error) {
+	if c.casConfig != "" {
+		cfg, err := casconfig.LoadFile(c.casConfig)
+		if err != nil {
+			return nil, nil, err
+		}
+		return cfg.Open(casregistry.UsageCLI, c.backend)
+	}
 	return casregistry.Open(c.backend, casregistry.UsageCLI)
 }
 
@@ -100,6 +112,8 @@ func cmdPut(args []string, out io.Writer, errOut io.Writer) int {
 	fs.SetOutput(errOut)
 	var common commonFlags
 	common.add(fs)
+	var emitBackendCIDs bool
+	fs.BoolVar(&emitBackendCIDs, "emit-backend-cids", false, "Emit JSON including per-backend CID map (requires write_policy=all)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -127,6 +141,39 @@ func cmdPut(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintf(errOut, "read %s: %v\n", filepath.Base(p), err)
 		return 1
 	}
+	if emitBackendCIDs {
+		type putAller interface {
+			PutAll([]byte) (cid.Cid, map[string]cid.Cid, error)
+		}
+		p, ok := cas.(putAller)
+		if !ok {
+			fmt.Fprintln(errOut, "--emit-backend-cids requires a replicating CAS (write_policy=all)")
+			return 2
+		}
+		canonical, byBackend, err := p.PutAll(b)
+		if err != nil {
+			fmt.Fprintln(errOut, err)
+			return 1
+		}
+		payload := struct {
+			Canonical string            `json:"canonical"`
+			Backends  map[string]string `json:"backends"`
+		}{
+			Canonical: canonical.String(),
+			Backends:  make(map[string]string, len(byBackend)),
+		}
+		for name, id := range byBackend {
+			payload.Backends[name] = id.String()
+		}
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(payload); err != nil {
+			fmt.Fprintln(errOut, err)
+			return 1
+		}
+		return 0
+	}
+
 	id, err := cas.Put(b)
 	if err != nil {
 		fmt.Fprintln(errOut, err)

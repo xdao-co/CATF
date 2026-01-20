@@ -28,6 +28,16 @@ type Backend struct {
 	// Open constructs the CAS using values parsed into flags registered by RegisterFlags.
 	// It returns an optional close function.
 	Open func() (storage.CAS, func() error, error)
+
+	// OpenWithConfig constructs the CAS using a backend-specific key/value map.
+	//
+	// This enables config-driven startup without routing through Go's flag parsing
+	// (which is process-global and awkward for multiple backends).
+	//
+	// When both Open and OpenWithConfig are present:
+	// - CLI programs typically use Open (after parsing flags)
+	// - Config-driven programs should prefer OpenWithConfig
+	OpenWithConfig func(cfg map[string]string) (storage.CAS, func() error, error)
 }
 
 var (
@@ -43,7 +53,7 @@ func Register(b Backend) error {
 	if b.RegisterFlags == nil {
 		return fmt.Errorf("casregistry: backend %q missing RegisterFlags", b.Name)
 	}
-	if b.Open == nil {
+	if b.Open == nil && b.OpenWithConfig == nil {
 		return fmt.Errorf("casregistry: backend %q missing Open", b.Name)
 	}
 	if b.Usage == 0 {
@@ -110,5 +120,26 @@ func Open(name string, usage Usage) (storage.CAS, func() error, error) {
 	if !b.Usage.allows(usage) {
 		return nil, nil, fmt.Errorf("backend %q not supported in this binary", name)
 	}
+	if b.Open == nil {
+		return nil, nil, fmt.Errorf("backend %q cannot be opened via flags", name)
+	}
 	return b.Open()
+}
+
+// OpenWithConfig opens the named backend if it exists and matches usage,
+// using a backend-specific key/value map.
+func OpenWithConfig(name string, usage Usage, cfg map[string]string) (storage.CAS, func() error, error) {
+	mu.RLock()
+	b, ok := backends[name]
+	mu.RUnlock()
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown backend %q", name)
+	}
+	if !b.Usage.allows(usage) {
+		return nil, nil, fmt.Errorf("backend %q not supported in this binary", name)
+	}
+	if b.OpenWithConfig == nil {
+		return nil, nil, fmt.Errorf("backend %q does not support config-based open", name)
+	}
+	return b.OpenWithConfig(cfg)
 }
