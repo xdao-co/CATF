@@ -11,26 +11,34 @@
 ## 0. What’s already strong (Implemented & Verified in Code)
 
 ### Canonicalization & determinism are actively enforced
+
 Evidence in repo:
+
 - `src/catf/canonicalize.go` + `src/catf/canonicalization_enforcement_test.go`
 - `src/crof/canonicalize.go` + `src/crof/canonicalization_enforcement_test.go`
 - `src/resolver/determinism_test.go`
 - Conformance fixtures under `src/testdata/conformance/...`
 
 ### Trust policy & verdict evidence are materialized (not just implied)
+
 Evidence in repo:
+
 - `src/tpdl/tpdl.go`
 - `src/resolver/verdict_evidence.go` (includes `PolicyVerdict` and reasons; enforces strict mode in name resolution)
 
 ### CROF exists as a real, testable artifact
+
 Evidence in repo:
+
 - `src/crof/document.go`, `src/crof/crof.go`, `src/crof/verify.go`
 - `src/crof/cid.go` (+ tests), supersession support:
   - `src/crof/supersession.go`
   - adversarial tests: `src/crof/supersession_adversarial_test.go`
 
 ### Stability policy is documented (API tiering)
+
 Evidence in repo:
+
 - `docs/STABILITY.md`
 - `docs/CONFORMANCE.md`
 - `docs/spec/*`
@@ -40,6 +48,7 @@ Evidence in repo:
 ## 1. GAPS (Missing to be “complete library”)
 
 ### GAP-01 — Storage is not a first‑class subsystem (CAS interface + adapters)
+
 **Problem:** The repo uses CIDs and talks about IPFS compatibility, but without a CAS subsystem the integration story becomes ad-hoc.
 **Impact:** Any API layer or Flux/controller integration has to invent storage semantics (risking non‑portable behavior).
 
@@ -265,4 +274,3 @@ You are “library complete” for the next step when:
 6. Add Flux integration pattern doc
 
 ---
-

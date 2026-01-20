@@ -1,4 +1,4 @@
-xDAO CLI Use Cases – End-to-End Workflows
+# xDAO CLI Use Cases – End-to-End Workflows
 
 Runnable demos:
 
@@ -107,7 +107,7 @@ Step 1 — Author publishes document
 
 xdao doc add ./whitepaper.md
 
-# returns CID: bafy-doc-001
+## returns CID: bafy-doc-001
 
 Step 2 — Author asserts authorship
 
@@ -116,7 +116,7 @@ xdao attest authorship \
   --role author \
   --key AUTHOR_KEY
 
-# returns CID: bafy-attest-A1
+## returns CID: bafy-attest-A1
 
 Step 3 — Reviewer approves document
 
@@ -125,7 +125,7 @@ xdao attest approval \
   --role reviewer \
   --key REVIEWER_KEY
 
-# returns CID: bafy-attest-R1
+## returns CID: bafy-attest-R1
 
 Step 4 — Trust Policy (Reviewer required)
 
@@ -213,7 +213,7 @@ Step 1 — Purchase agreement stored
 
 xdao doc add ./purchase-agreement.pdf
 
-# CID: bafy-doc-REA-001
+## CID: bafy-doc-REA-001
 
 ⸻
 
@@ -324,7 +324,7 @@ Step 1 — Paper stored
 
 xdao doc add ./paper.pdf
 
-# CID: bafy-doc-SCI-001
+## CID: bafy-doc-SCI-001
 
 ⸻
 
@@ -449,7 +449,7 @@ Minimum CLI note: the reference system may include `doc add`. The minimum CLI pr
 
 xdao-catf doc-cid alice-signing.pub
 
-# Subject CID: bafy-doc-key-signing
+## Subject CID: bafy-doc-key-signing
 
 ⸻
 
