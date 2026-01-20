@@ -37,7 +37,11 @@ type Config struct {
 }
 
 type BackendConfig struct {
-	Name   string            `json:"name"`
+	// Name is the casregistry backend name to open (e.g. "grpc", "localfs", "ipfs").
+	Name string `json:"name"`
+	// ID is an optional stable alias used for identification and per-backend CID maps.
+	// If empty, Name is used.
+	ID     string            `json:"id,omitempty"`
 	Config map[string]string `json:"config,omitempty"`
 }
 
@@ -60,10 +64,19 @@ func (c Config) Validate() error {
 	if len(c.Backends) == 0 {
 		return errors.New("casconfig: at least one backend is required")
 	}
+	seen := make(map[string]struct{}, len(c.Backends))
 	for _, b := range c.Backends {
 		if b.Name == "" {
 			return errors.New("casconfig: backend name is required")
 		}
+		id := b.Name
+		if b.ID != "" {
+			id = b.ID
+		}
+		if _, ok := seen[id]; ok {
+			return fmt.Errorf("casconfig: duplicate backend id %q", id)
+		}
+		seen[id] = struct{}{}
 	}
 	switch c.WritePolicy {
 	case "", "first", "all":
@@ -86,7 +99,7 @@ func (c Config) Open(usage casregistry.Usage, preferredBackend string) (storage.
 	if preferredBackend != "" {
 		idx := -1
 		for i := range ordered {
-			if ordered[i].Name == preferredBackend {
+			if ordered[i].Name == preferredBackend || ordered[i].ID == preferredBackend {
 				idx = i
 				break
 			}
@@ -111,7 +124,11 @@ func (c Config) Open(usage casregistry.Usage, preferredBackend string) (storage.
 			}
 			return nil, nil, err
 		}
-		named = append(named, storage.NamedCAS{Name: b.Name, CAS: cas})
+		name := b.Name
+		if b.ID != "" {
+			name = b.ID
+		}
+		named = append(named, storage.NamedCAS{Name: name, CAS: cas})
 		if closeFn != nil {
 			closers = append(closers, closeFn)
 		}

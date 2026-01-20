@@ -63,18 +63,13 @@ When you do that, you MUST provide a **content-addressable store (CAS)** that ca
 
 The core library expresses this as a small interface (`xdao.co/catf/storage.CAS`).
 
-CAS backends are provided as **plugins** (separate Go modules) and are linked into your binary via blank imports.
-
-Reference plugins:
-
-- Local filesystem CAS: `xdao.co/catf-localfs/localfs`
-- IPFS repo CAS (Kubo CLI adapter): `xdao.co/catf-ipfs/ipfs`
+For most deployments (and all walkthroughs/examples in this repo), CAS backends run out-of-process as **downloadable daemon plugins** from GitHub Releases.
+Your process uses the built-in gRPC client to talk to them.
 
 It also ships an optional **CAS gRPC transport** layer that can expose any `storage.CAS` implementation over a gRPC boundary:
 
 - gRPC protocol + client/server adapters: `xdao.co/catf/storage/grpccas`
-- Reference daemon (wraps LocalFS or IPFS and serves gRPC): `./bin/xdao-casgrpcd`
-- Downloadable plugin daemons (no CATF recompile needed): `xdao-casgrpcd-localfs`, `xdao-casgrpcd-ipfs` (install via `./bin/xdao-cascli plugin install ...`)
+- Downloadable daemon plugins (no CATF recompile needed): `xdao-casgrpcd-localfs`, `xdao-casgrpcd-ipfs` (install via `./bin/xdao-cascli plugin install ...`)
 
 Design note:
 
@@ -109,7 +104,10 @@ If you want to integrate a CAS provider across a process boundary (or prove that
 Server-side (expose an existing CAS over gRPC):
 
 ```go
-backendCAS, _ := localfs.New("/var/lib/xdao/cas")
+// backendCAS can be any implementation of storage.CAS.
+// In CATF walkthroughs, this is typically a downloaded daemon plugin (run out-of-process),
+// so you usually won't write this server code yourself.
+var backendCAS storage.CAS = /* your CAS implementation */
 
 s := grpc.NewServer()
 grpccas.RegisterCASServer(s, &grpccas.Server{CAS: backendCAS})
@@ -133,7 +131,7 @@ Reference CLI demo:
 make walkthrough-grpc-localfs
 ```
 
-This starts `xdao-casgrpcd` (LocalFS backend) and runs the standard “store everything” lifecycle through `xdao-cascli --backend grpc`.
+This installs/starts the LocalFS daemon plugin (`xdao-casgrpcd-localfs`) and runs the standard “store everything” lifecycle through `xdao-cascli --backend grpc`.
 
 If you want the same daemon experience without building this repo, install and run the downloadable daemon instead:
 
@@ -147,14 +145,18 @@ xdao-casgrpcd-localfs --listen 127.0.0.1:7777 --backend localfs --localfs-dir /t
 If you want to consult multiple stores (e.g., local first, then optional transports), use `storage.MultiCAS`.
 Adapter ordering is slice order (deterministic).
 
+When using downloaded daemon plugins, compose them by dialing multiple gRPC endpoints:
+
 ```go
-// In your binary, link the plugins you want (blank imports), then open them.
-// See "Runtime selection via config" below for a config-driven approach.
+local, err := grpccas.Dial("127.0.0.1:7777", grpccas.DialOptions{})
+if err != nil { /* ... */ }
+defer local.Close()
 
-local, _ := localfs.New("/var/lib/xdao/cas")
-ipfsCAS := ipfs.New(ipfs.Options{}) // optional (defaults to pin=true)
+remote, err := grpccas.Dial("127.0.0.1:7778", grpccas.DialOptions{})
+if err != nil { /* ... */ }
+defer remote.Close()
 
-cas := storage.MultiCAS{Adapters: []storage.CAS{local, ipfsCAS}}
+cas := storage.MultiCAS{Adapters: []storage.CAS{local, remote}}
 ```
 
 Note: writes go to the first adapter only; reads try adapters in order.
@@ -163,10 +165,12 @@ Note: writes go to the first adapter only; reads try adapters in order.
 
 IPFS is an optional transport/pinning layer for exchanging blocks with other peers. It is not required to use CATF.
 
-If you want to store bytes in a local IPFS repo (no daemon required), use the CAS tooling (`xdao-cascli`) with the IPFS plugin backend:
+If you want to store bytes in a local IPFS repo using only downloaded plugins, run the IPFS plugin daemon and use the gRPC client:
 
 ```sh
-./bin/xdao-cascli put --backend ipfs --ipfs-path ~/.ipfs ./path/to/subject.bin
+./bin/xdao-cascli plugin install --plugin ipfs
+xdao-casgrpcd-ipfs --listen 127.0.0.1:7777 --backend ipfs --ipfs-path ~/.ipfs
+./bin/xdao-cascli put --backend grpc --grpc-target 127.0.0.1:7777 ./path/to/subject.bin
 ```
 
 If you intend other peers to fetch the content, you need a network-facing node (or pinning layer):
@@ -183,10 +187,8 @@ Optional tests:
 ### Runtime selection via config ("inject" plugins at runtime)
 
 Go does not dynamically load Go modules at runtime in this project.
-"Injection" here means:
 
-1) you link one or more CAS plugins into your binary (blank imports), and
-2) you select/compose them at runtime via a JSON config file.
+If you want runtime selection *without recompiling*, use downloaded daemon plugins and point the config at one or more gRPC targets.
 
 The reference config loader is `xdao.co/catf/storage/casconfig`.
 
@@ -196,8 +198,8 @@ Example config:
 {
   "write_policy": "all",
   "backends": [
-    {"name": "localfs", "config": {"localfs-dir": "/var/lib/xdao/cas"}},
-    {"name": "ipfs", "config": {"ipfs-path": "/var/lib/xdao/ipfs", "pin": "true"}}
+    {"name": "grpc", "id": "localfs", "config": {"grpc-target": "127.0.0.1:7777"}},
+    {"name": "grpc", "id": "ipfs", "config": {"grpc-target": "127.0.0.1:7778"}}
   ]
 }
 ```
@@ -206,7 +208,7 @@ In Go:
 
 ```go
 cfg, _ := casconfig.LoadFile("/path/to/cas.json")
-cas, closeFn, _ := cfg.Open(casregistry.UsageCLI, "localfs")
+cas, closeFn, _ := cfg.Open(casregistry.UsageCLI, "localfs") // prefers backend by id/name
 defer closeFn()
 ```
 

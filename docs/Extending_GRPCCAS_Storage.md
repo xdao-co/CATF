@@ -199,12 +199,7 @@ _ = s.Serve(lis)
 
 ### Option B: use the reference daemon
 
-This repo includes a small reference daemon that exposes either LocalFS or IPFS over gRPC:
-
-- binary: `./bin/xdao-casgrpcd`
-- source: `src/cmd/xdao-casgrpcd`
-
-If you want the same functionality without building this repo, you can install a downloadable daemon from GitHub Releases:
+If you want the daemon experience without building this repo, install the downloadable daemon plugins from GitHub Releases:
 
 ```sh
 ./bin/xdao-cascli plugin install --plugin localfs
@@ -214,13 +209,13 @@ If you want the same functionality without building this repo, you can install a
 Example:
 
 ```sh
-./bin/xdao-casgrpcd --listen 127.0.0.1:7777 --backend localfs --localfs-dir /tmp/xdao-cas
+xdao-casgrpcd-localfs --listen 127.0.0.1:7777 --backend localfs --localfs-dir /tmp/xdao-cas
 ```
 
 Config-driven (runtime selection/composition):
 
 ```sh
-./bin/xdao-casgrpcd --listen 127.0.0.1:7777 --cas-config ./cas.json --backend localfs
+xdao-casgrpcd-localfs --listen 127.0.0.1:7777 --cas-config ./cas.json --backend localfs
 ```
 
 ---
@@ -249,14 +244,15 @@ Yes. In the current architecture, LocalFS and IPFS backends are delivered as ext
 - IPFS (Kubo CLI adapter): `xdao.co/catf-ipfs/ipfs`
 
 They register themselves with `storage/casregistry` in `init()`.
-CATF binaries link them in via blank imports, and select them at runtime via flags or JSON config.
+
+For end-users and walkthroughs, the preferred integration is via the downloadable daemon plugins (`xdao-casgrpcd-localfs`, `xdao-casgrpcd-ipfs`) and the `grpc` CAS client.
 
 Because they implement the common interface, they are interchangeable in:
 
 - the resolver (Go integration)
 - the CAS gRPC server wrapper (`grpccas.Server`)
 - the CAS gRPC client wrapper (`grpccas.Client`)
-- CLI tooling (`xdao-cascli`, `xdao-casgrpcd`, and the downloadable `xdao-casgrpcd-localfs` / `xdao-casgrpcd-ipfs`) by selecting the backend
+- CLI tooling (`xdao-cascli` plus the downloadable `xdao-casgrpcd-localfs` / `xdao-casgrpcd-ipfs`) by selecting the backend
 
 ---
 

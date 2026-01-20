@@ -5,6 +5,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 XDAO_CATF_BIN="$REPO_ROOT/bin/xdao-catf"
 XDAO_CASCLI_BIN="$REPO_ROOT/bin/xdao-cascli"
+XDAO_CASGRPCD_LOCALFS_BIN="$REPO_ROOT/bin/xdao-casgrpcd-localfs"
+XDAO_CASGRPCD_IPFS_BIN="$REPO_ROOT/bin/xdao-casgrpcd-ipfs"
 
 if [[ ! -x "$XDAO_CATF_BIN" ]]; then
   echo "Missing $XDAO_CATF_BIN" >&2
@@ -30,10 +32,33 @@ IPFS_REPO="$WORK_DIR/ipfsrepo"
 HOME_DIR="$WORK_DIR/home"
 mkdir -p "$CAS_DIR" "$IPFS_REPO" "$HOME_DIR"
 
+GRPC_LOG_LOCALFS="$WORK_DIR/casgrpcd-localfs.log"
+GRPC_LOG_IPFS="$WORK_DIR/casgrpcd-ipfs.log"
+GRPC_PID_LOCALFS=""
+GRPC_PID_IPFS=""
+GRPC_ADDR_LOCALFS=""
+GRPC_ADDR_IPFS=""
+
 cleanup() {
   status=$?
+
+  if [[ -n "$GRPC_PID_LOCALFS" ]]; then
+    kill "$GRPC_PID_LOCALFS" >/dev/null 2>&1 || true
+    wait "$GRPC_PID_LOCALFS" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$GRPC_PID_IPFS" ]]; then
+    kill "$GRPC_PID_IPFS" >/dev/null 2>&1 || true
+    wait "$GRPC_PID_IPFS" >/dev/null 2>&1 || true
+  fi
+
   if [[ -n "${XDAO_KEEP_WORKDIR:-}" || $status -ne 0 ]]; then
     echo "Keeping work dir: $WORK_DIR" >&2
+    if [[ -s "$GRPC_LOG_LOCALFS" ]]; then
+      echo "LocalFS gRPC server log: $GRPC_LOG_LOCALFS" >&2
+    fi
+    if [[ -s "$GRPC_LOG_IPFS" ]]; then
+      echo "IPFS gRPC server log: $GRPC_LOG_IPFS" >&2
+    fi
     return
   fi
   rm -rf "$WORK_DIR"
@@ -48,18 +73,92 @@ echo "Work dir: $WORK_DIR" >&2
 echo "LocalFS CAS dir: $CAS_DIR" >&2
 echo "IPFS repo dir: $IPFS_REPO" >&2
 
-# Initialize an offline local repo (no daemon required).
+# Initialize an offline local repo.
 if [[ ! -f "$IPFS_REPO/config" ]]; then
   IPFS_PATH="$IPFS_REPO" ipfs init >/dev/null
 fi
+
+# Install plugin daemons (downloaded from GitHub Releases) into ./bin.
+"$XDAO_CASCLI_BIN" plugin install --plugin localfs --install-dir "$REPO_ROOT/bin" --overwrite >/dev/null
+"$XDAO_CASCLI_BIN" plugin install --plugin ipfs --install-dir "$REPO_ROOT/bin" --overwrite >/dev/null
+if [[ ! -x "$XDAO_CASGRPCD_LOCALFS_BIN" ]]; then
+  echo "Missing $XDAO_CASGRPCD_LOCALFS_BIN after plugin install" >&2
+  exit 1
+fi
+if [[ ! -x "$XDAO_CASGRPCD_IPFS_BIN" ]]; then
+  echo "Missing $XDAO_CASGRPCD_IPFS_BIN after plugin install" >&2
+  exit 1
+fi
+
+# Start both daemons on ephemeral ports.
+
+CAS_CONFIG_LOCALFS="$WORK_DIR/cas.localfs.daemon.json"
+cat >"$CAS_CONFIG_LOCALFS" <<EOF
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "localfs", "config": {"localfs-dir": "$CAS_DIR"}}
+  ]
+}
+EOF
+
+CAS_CONFIG_IPFS="$WORK_DIR/cas.ipfs.daemon.json"
+cat >"$CAS_CONFIG_IPFS" <<EOF
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "ipfs", "config": {"ipfs-path": "$IPFS_REPO", "pin": "true"}}
+  ]
+}
+EOF
+
+"$XDAO_CASGRPCD_LOCALFS_BIN" \
+  --listen 127.0.0.1:0 \
+  --backend localfs \
+  --cas-config "$CAS_CONFIG_LOCALFS" \
+  2>"$GRPC_LOG_LOCALFS" &
+GRPC_PID_LOCALFS=$!
+
+"$XDAO_CASGRPCD_IPFS_BIN" \
+  --listen 127.0.0.1:0 \
+  --backend ipfs \
+  --cas-config "$CAS_CONFIG_IPFS" \
+  2>"$GRPC_LOG_IPFS" &
+GRPC_PID_IPFS=$!
+
+for _ in $(seq 1 100); do
+  GRPC_ADDR_LOCALFS="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG_LOCALFS" | head -n 1)"
+  if [[ -n "$GRPC_ADDR_LOCALFS" ]]; then
+    break
+  fi
+  sleep 0.05
+done
+
+for _ in $(seq 1 100); do
+  GRPC_ADDR_IPFS="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG_IPFS" | head -n 1)"
+  if [[ -n "$GRPC_ADDR_IPFS" ]]; then
+    break
+  fi
+  sleep 0.05
+done
+
+if [[ -z "$GRPC_ADDR_LOCALFS" || -z "$GRPC_ADDR_IPFS" ]]; then
+  echo "failed to start one or more gRPC servers" >&2
+  cat "$GRPC_LOG_LOCALFS" >&2 || true
+  cat "$GRPC_LOG_IPFS" >&2 || true
+  exit 1
+fi
+
+echo "gRPC target (localfs): $GRPC_ADDR_LOCALFS" >&2
+echo "gRPC target (ipfs):   $GRPC_ADDR_IPFS" >&2
 
 CAS_CONFIG="$WORK_DIR/cas.all.json"
 cat >"$CAS_CONFIG" <<EOF
 {
   "write_policy": "all",
   "backends": [
-    {"name": "localfs", "config": {"localfs-dir": "$CAS_DIR"}},
-    {"name": "ipfs", "config": {"ipfs-path": "$IPFS_REPO", "pin": "true"}}
+    {"name": "grpc", "id": "localfs", "config": {"grpc-target": "$GRPC_ADDR_LOCALFS"}},
+    {"name": "grpc", "id": "ipfs", "config": {"grpc-target": "$GRPC_ADDR_IPFS"}}
   ]
 }
 EOF
@@ -67,7 +166,7 @@ EOF
 echo "CAS config: $CAS_CONFIG" >&2
 
 # 1) Store the subject bytes, emitting CID multiples.
-SUBJECT_JSON="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs --emit-backend-cids "$DOC_PATH")"
+SUBJECT_JSON="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend grpc --emit-backend-cids "$DOC_PATH")"
 SUBJECT_CID="$(printf '%s' "$SUBJECT_JSON" | sed -n 's/^[[:space:]]*"canonical"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p' | head -n 1)"
 if [[ -z "$SUBJECT_CID" ]]; then
   echo "failed to parse canonical CID from put JSON" >&2
@@ -102,7 +201,7 @@ A1_META="$WORK_DIR/a1.meta"
   --role author \
   > "$A1_CATF") 2> "$A1_META"
 A1_CID_EXPECTED="$(grep '^Attestation-CID: ' "$A1_META" | sed 's/^Attestation-CID: //')"
-A1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$A1_CATF")"
+A1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend grpc "$A1_CATF")"
 if [[ "$A1_CID" != "$A1_CID_EXPECTED" ]]; then
   echo "Attestation CID mismatch (A1): expected $A1_CID_EXPECTED, got $A1_CID" >&2
   exit 1
@@ -123,7 +222,7 @@ R1_META="$WORK_DIR/r1.meta"
   --claim "Comment=Reviewed and approved" \
   > "$R1_CATF") 2> "$R1_META"
 R1_CID_EXPECTED="$(grep '^Attestation-CID: ' "$R1_META" | sed 's/^Attestation-CID: //')"
-R1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$R1_CATF")"
+R1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend grpc "$R1_CATF")"
 if [[ "$R1_CID" != "$R1_CID_EXPECTED" ]]; then
   echo "Attestation CID mismatch (R1): expected $R1_CID_EXPECTED, got $R1_CID" >&2
   exit 1
@@ -159,14 +258,14 @@ Require:
 -----END XDAO TRUST POLICY-----
 EOF
 
-POLICY_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$POLICY_PATH")"
+POLICY_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend grpc "$POLICY_PATH")"
 echo "Policy CID: $POLICY_CID" >&2
 
 # 5) Resolve purely from CIDs via CAS, render CROF bytes, store CROF bytes in CAS.
 CROF_PATH="$WORK_DIR/out.crof"
 CROF_META="$WORK_DIR/out.meta"
 if ! "$XDAO_CASCLI_BIN" resolve \
-  --cas-config "$CAS_CONFIG" --backend localfs \
+  --cas-config "$CAS_CONFIG" --backend grpc \
   --subject "$SUBJECT_CID" \
   --policy "$POLICY_CID" \
   --att "$A1_CID" \
@@ -178,7 +277,7 @@ if ! "$XDAO_CASCLI_BIN" resolve \
 fi
 
 CROF_CID_RENDERED="$(grep '^CROF-CID: ' "$CROF_META" | sed 's/^CROF-CID: //')"
-CROF_JSON="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs --emit-backend-cids "$CROF_PATH")"
+CROF_JSON="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend grpc --emit-backend-cids "$CROF_PATH")"
 CROF_CID_STORED="$(printf '%s' "$CROF_JSON" | sed -n 's/^[[:space:]]*"canonical"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p' | head -n 1)"
 
 if [[ -z "$CROF_CID_STORED" ]]; then

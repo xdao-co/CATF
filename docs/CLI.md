@@ -27,7 +27,9 @@ go run ./cmd/xdao-catf --help
 
 ## End-to-end demonstration (recommended)
 
-If your goal is to demonstrate the entire lifecycle (subject → attestations → policy → resolve → CROF) **and** store all artifacts in a content-addressable store, use the walkthrough Makefile targets:
+If your goal is to demonstrate the entire lifecycle (subject → attestations → policy → resolve → CROF) **and** store all artifacts in a content-addressable store, use the walkthrough Makefile targets.
+
+These walkthroughs run CAS operations through **downloaded plugin daemons** (from GitHub Releases) over the CAS **gRPC** interface.
 
 ```sh
 make walkthrough-localfs
@@ -39,7 +41,7 @@ Optional (requires Kubo `ipfs` on PATH):
 make walkthrough-ipfs
 ```
 
-You can also run the same “store everything” demo through the **CAS gRPC interface** (a reference way to prove a backend is “CAS-compliant” over the network boundary). This starts a local gRPC server and then runs the same flow through a gRPC client:
+Aliases (same behavior; retained for compatibility):
 
 ```sh
 make walkthrough-grpc-localfs
@@ -170,13 +172,7 @@ Notes:
 - If you hit GitHub API rate limits, set `GITHUB_TOKEN` (or pass `--github-token`).
 - The IPFS plugin daemon requires Kubo `ipfs` to be installed and available on `PATH`.
 
-To store bytes into a local IPFS repo (no daemon required), use the IPFS CAS plugin:
-
-```sh
-./bin/xdao-cascli put --backend ipfs --ipfs-path ~/.ipfs ./examples/whitepaper.txt
-```
-
-To select backends at runtime (including multi-backend write replication), use `--cas-config`:
+To select one or more gRPC backends at runtime (including multi-backend write replication), use `--cas-config`:
 
 ```sh
 ./bin/xdao-cascli put --cas-config ./cas.json --emit-backend-cids ./examples/whitepaper.txt

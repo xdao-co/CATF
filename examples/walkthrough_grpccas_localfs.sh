@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 XDAO_CATF_BIN="$REPO_ROOT/bin/xdao-catf"
 XDAO_CASCLI_BIN="$REPO_ROOT/bin/xdao-cascli"
-XDAO_CASGRPCD_BIN="$REPO_ROOT/bin/xdao-casgrpcd"
+XDAO_CASGRPCD_BIN="$REPO_ROOT/bin/xdao-casgrpcd-localfs"
 
 if [[ ! -x "$XDAO_CATF_BIN" ]]; then
   echo "Missing $XDAO_CATF_BIN" >&2
@@ -19,9 +19,11 @@ if [[ ! -x "$XDAO_CASCLI_BIN" ]]; then
   exit 1
 fi
 
+
+# Install the LocalFS gRPC daemon plugin (downloaded from GitHub Releases) into ./bin.
+"$XDAO_CASCLI_BIN" plugin install --plugin localfs --install-dir "$REPO_ROOT/bin" --overwrite >/dev/null
 if [[ ! -x "$XDAO_CASGRPCD_BIN" ]]; then
-  echo "Missing $XDAO_CASGRPCD_BIN" >&2
-  echo "Run: make build-casgrpcd" >&2
+  echo "Missing $XDAO_CASGRPCD_BIN after plugin install" >&2
   exit 1
 fi
 

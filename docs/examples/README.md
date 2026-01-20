@@ -28,12 +28,10 @@ make walkthrough-ipfs
 
 ### Optional: CAS gRPC transport demos
 
-These variants run the same “store everything in a CAS” lifecycle, but route all CAS operations through the CAS gRPC protocol.
+These walkthroughs route CAS operations through the CAS gRPC protocol using **downloaded plugin daemons**.
 
-This is a reference way to demonstrate “CAS compliant storage” over a network boundary:
-
-- A backend CAS implementation is exposed via `./bin/xdao-casgrpcd` (or via the downloadable plugin daemons `xdao-casgrpcd-localfs` / `xdao-casgrpcd-ipfs`)
-- The client side uses `./bin/xdao-cascli --backend grpc --grpc-target ...`
+- Daemons: `xdao-casgrpcd-localfs` / `xdao-casgrpcd-ipfs` (installed via `./bin/xdao-cascli plugin install ...`)
+- Client side: `./bin/xdao-cascli --backend grpc --grpc-target ...`
 
 LocalFS backend via gRPC:
 
@@ -94,7 +92,7 @@ By default, the scripts use `xdao-catf doc-cid` (CID computation only).
 
 IPFS is optional: the scripts work fully offline without IPFS.
 
-If you want the scripts to also store the subject bytes into a local IPFS repo (no daemon required), set:
+If you want the scripts to also store the subject bytes into a local IPFS repo (via the downloadable IPFS daemon plugin), set:
 
 ```sh
 XDAO_USE_IPFS=1 ./examples/usecase1_document_publishing.sh
@@ -103,4 +101,5 @@ XDAO_USE_IPFS=1 ./examples/usecase1_document_publishing.sh
 This switches subject CID creation to:
 
 - `ipfs init` (under the script’s temporary `HOME`), then
-- `xdao-cascli put --backend ipfs --ipfs-path "$HOME/.ipfs" ...`
+- install/start `xdao-casgrpcd-ipfs`, then
+- `xdao-cascli put --backend grpc --grpc-target <host:port> ...`

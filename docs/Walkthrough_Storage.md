@@ -9,11 +9,9 @@ This walkthrough demonstrates the complete CATF lifecycle:
 5) Resolve deterministically (CROF)
 6) Store **all artifacts** (subject, policy, attestations, CROF) in a **content-addressable store (CAS)**
 
-Three CAS paths are demonstrated:
+All walkthroughs route CAS operations through the **CAS gRPC interface** using **downloaded plugin daemons**.
 
-- **Local filesystem CAS** (fully offline, no external tools)
-- **Local IPFS repo CAS** (optional; requires Kubo `ipfs`)
-- **CAS gRPC transport** (optional; wraps either LocalFS or IPFS behind a gRPC boundary)
+This avoids in-process/local CAS implementations during demos.
 
 The runnable entrypoints are Makefile targets.
 
@@ -24,6 +22,10 @@ The runnable entrypoints are Makefile targets.
 - Go 1.22+
 - Run from the repo root
 
+Required (for plugin installation):
+
+- Network access to GitHub Releases (or set `GITHUB_TOKEN` / use `--github-token`)
+
 Optional (for the IPFS walkthrough):
 
 - Kubo `ipfs` CLI installed and on `PATH`
@@ -32,13 +34,13 @@ Optional (for the IPFS walkthrough):
 
 ## Quick start (recommended)
 
-Build and run the local filesystem walkthrough:
+Build and run the LocalFS plugin-daemon walkthrough:
 
 ```sh
 make walkthrough-localfs
 ```
 
-Run the combined localfs+ipfs walkthrough using a single config (replicate writes to both backends; optional; requires Kubo `ipfs`):
+Run the combined LocalFS+IPFS walkthrough using a single config (replicate writes to both plugin daemons; optional; requires Kubo `ipfs`):
 
 ```sh
 make walkthrough-all
@@ -50,16 +52,10 @@ Run the IPFS walkthrough (optional):
 make walkthrough-ipfs
 ```
 
-Run the same demo through the CAS gRPC interface (LocalFS backend):
+Aliases (same behavior; retained for compatibility):
 
 ```sh
 make walkthrough-grpc-localfs
-```
-
-Run the same demo through the CAS gRPC interface (IPFS backend; optional):
-
-```sh
-make walkthrough-grpc-ipfs
 ```
 
 Run both:
@@ -81,9 +77,11 @@ make walkthrough-grpc
 CATF uses a lightweight CAS plugin registry (`storage/casregistry`).
 Backends are linked into the binaries (blank imports), then selected/composed at runtime.
 
-Both `xdao-cascli` and `xdao-casgrpcd` accept `--cas-config` to open backends from a JSON file.
+Both `xdao-cascli` and the plugin daemons accept `--cas-config` to open backends from a JSON file.
 
-### Config: localfs only
+In this repo’s walkthroughs, the **daemon** uses a backend config (localfs or ipfs), and the **client** (`xdao-cascli`) uses `--backend grpc` to talk to that daemon.
+
+### Config: localfs daemon (plugin)
 
 ```json
 {
@@ -94,7 +92,7 @@ Both `xdao-cascli` and `xdao-casgrpcd` accept `--cas-config` to open backends fr
 }
 ```
 
-### Config: ipfs only
+### Config: ipfs daemon (plugin)
 
 ```json
 {
@@ -107,14 +105,16 @@ Both `xdao-cascli` and `xdao-casgrpcd` accept `--cas-config` to open backends fr
 
 ### Config: all backends (replicate writes)
 
-Example config (replicate writes to *both* localfs and ipfs):
+Example config (replicate writes to *both* gRPC backends).
+
+This requires unique backend IDs so the per-backend CID map is stable:
 
 ```json
 {
   "write_policy": "all",
   "backends": [
-    {"name": "localfs", "config": {"localfs-dir": "/tmp/xdao-cas"}},
-    {"name": "ipfs", "config": {"ipfs-path": "/tmp/xdao-ipfs", "pin": "true"}}
+    {"name": "grpc", "id": "localfs", "config": {"grpc-target": "127.0.0.1:7777"}},
+    {"name": "grpc", "id": "ipfs", "config": {"grpc-target": "127.0.0.1:7778"}}
   ]
 }
 ```
@@ -122,7 +122,7 @@ Example config (replicate writes to *both* localfs and ipfs):
 Write a file and print "CID multiples" (per-backend CID map) as JSON:
 
 ```sh
-./bin/xdao-cascli put --cas-config ./cas.json --emit-backend-cids ./examples/whitepaper.txt
+./bin/xdao-cascli put --cas-config ./cas.json --backend grpc --emit-backend-cids ./examples/whitepaper.txt
 ```
 
 ---
@@ -179,8 +179,7 @@ They use:
 
 The gRPC variants additionally use:
 
-- `./bin/xdao-casgrpcd` to expose a CAS backend (LocalFS or IPFS) over the CAS gRPC protocol
-- Alternatively, you can install and run the downloadable plugin daemons (`xdao-casgrpcd-localfs`, `xdao-casgrpcd-ipfs`) via `./bin/xdao-cascli plugin install ...`
+- Downloadable plugin daemons (`xdao-casgrpcd-localfs`, `xdao-casgrpcd-ipfs`) installed via `./bin/xdao-cascli plugin install ...`
 - `xdao-cascli --backend grpc --grpc-target <host:port>` to exercise the exact same flow through the network boundary
 
 Internally, `xdao-cascli` performs the “resolve from CIDs” step via the public Go API:

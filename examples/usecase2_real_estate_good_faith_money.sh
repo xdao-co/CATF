@@ -12,6 +12,18 @@ fi
 
 XDAO_CASCLI_BIN="$REPO_ROOT/bin/xdao-cascli"
 
+IPFS_DAEMON_BIN="$REPO_ROOT/bin/xdao-casgrpcd-ipfs"
+IPFS_DAEMON_LOG=""
+IPFS_DAEMON_PID=""
+
+cleanup() {
+  if [[ -n "$IPFS_DAEMON_PID" ]]; then
+    kill "$IPFS_DAEMON_PID" >/dev/null 2>&1 || true
+    wait "$IPFS_DAEMON_PID" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
 HOME_DIR="$(mktemp -d /tmp/xdao-home.XXXXXX)"
 export HOME="$HOME_DIR"
 
@@ -29,7 +41,45 @@ if [[ -n "${XDAO_USE_IPFS:-}" ]]; then
   fi
   ipfs init >/dev/null
 
-  SUBJECT_CID="$("$XDAO_CASCLI_BIN" put --backend ipfs --ipfs-path "$HOME/.ipfs" "$REPO_ROOT/examples/purchase-agreement.txt")"
+  "$XDAO_CASCLI_BIN" plugin install --plugin ipfs --install-dir "$REPO_ROOT/bin" --overwrite >/dev/null
+  if [[ ! -x "$IPFS_DAEMON_BIN" ]]; then
+    echo "Missing $IPFS_DAEMON_BIN after plugin install" >&2
+    exit 1
+  fi
+
+  IPFS_DAEMON_LOG="$(mktemp -t xdao-ipfs-daemon.XXXXXX.log)"
+  IPFS_CAS_CONFIG="$(mktemp -t xdao-ipfs-daemon.XXXXXX.json)"
+  cat >"$IPFS_CAS_CONFIG" <<EOF
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "ipfs", "config": {"ipfs-path": "$HOME/.ipfs", "pin": "true"}}
+  ]
+}
+EOF
+
+  "$IPFS_DAEMON_BIN" \
+    --listen 127.0.0.1:0 \
+    --backend ipfs \
+    --cas-config "$IPFS_CAS_CONFIG" \
+    2>"$IPFS_DAEMON_LOG" &
+  IPFS_DAEMON_PID=$!
+
+  GRPC_ADDR=""
+  for _ in $(seq 1 100); do
+    GRPC_ADDR="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$IPFS_DAEMON_LOG" | head -n 1)"
+    if [[ -n "$GRPC_ADDR" ]]; then
+      break
+    fi
+    sleep 0.05
+  done
+  if [[ -z "$GRPC_ADDR" ]]; then
+    echo "failed to start IPFS gRPC daemon" >&2
+    cat "$IPFS_DAEMON_LOG" >&2 || true
+    exit 1
+  fi
+
+  SUBJECT_CID="$("$XDAO_CASCLI_BIN" put --backend grpc --grpc-target "$GRPC_ADDR" "$REPO_ROOT/examples/purchase-agreement.txt")"
 else
   SUBJECT_CID="$("$XDAO_CATF_BIN" doc-cid "$REPO_ROOT/examples/purchase-agreement.txt")"
 fi

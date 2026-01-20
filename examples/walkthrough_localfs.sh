@@ -5,6 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 XDAO_CATF_BIN="$REPO_ROOT/bin/xdao-catf"
 XDAO_CASCLI_BIN="$REPO_ROOT/bin/xdao-cascli"
+XDAO_CASGRPCD_LOCALFS_BIN="$REPO_ROOT/bin/xdao-casgrpcd-localfs"
 
 if [[ ! -x "$XDAO_CATF_BIN" ]]; then
   echo "Missing $XDAO_CATF_BIN" >&2
@@ -33,10 +34,23 @@ cat >"$CAS_CONFIG" <<EOF
 }
 EOF
 
+GRPC_LOG="$WORK_DIR/casgrpcd.log"
+GRPC_PID=""
+GRPC_ADDR=""
+
 cleanup() {
   status=$?
+
+  if [[ -n "$GRPC_PID" ]]; then
+    kill "$GRPC_PID" >/dev/null 2>&1 || true
+    wait "$GRPC_PID" >/dev/null 2>&1 || true
+  fi
+
   if [[ -n "${XDAO_KEEP_WORKDIR:-}" || $status -ne 0 ]]; then
     echo "Keeping work dir: $WORK_DIR" >&2
+    if [[ -s "$GRPC_LOG" ]]; then
+      echo "gRPC server log: $GRPC_LOG" >&2
+    fi
     return
   fi
   rm -rf "$WORK_DIR"
@@ -51,8 +65,39 @@ echo "Work dir: $WORK_DIR" >&2
 echo "LocalFS CAS dir: $CAS_DIR" >&2
 echo "CAS config: $CAS_CONFIG" >&2
 
-# 1) Store the subject bytes in localfs CAS.
-SUBJECT_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$DOC_PATH")"
+# Install the LocalFS gRPC daemon plugin (downloaded from GitHub Releases) into ./bin.
+"$XDAO_CASCLI_BIN" plugin install --plugin localfs --install-dir "$REPO_ROOT/bin" --overwrite >/dev/null
+if [[ ! -x "$XDAO_CASGRPCD_LOCALFS_BIN" ]]; then
+  echo "Missing $XDAO_CASGRPCD_LOCALFS_BIN after plugin install" >&2
+  exit 1
+fi
+
+# Start a CAS gRPC daemon exposing localfs.
+"$XDAO_CASGRPCD_LOCALFS_BIN" \
+  --listen 127.0.0.1:0 \
+  --backend localfs \
+  --cas-config "$CAS_CONFIG" \
+  2>"$GRPC_LOG" &
+GRPC_PID=$!
+
+for _ in $(seq 1 100); do
+  GRPC_ADDR="$(sed -n 's/^xdao-casgrpcd listening on \(.*\) (backend=.*$/\1/p' "$GRPC_LOG" | head -n 1)"
+  if [[ -n "$GRPC_ADDR" ]]; then
+    break
+  fi
+  sleep 0.05
+done
+
+if [[ -z "$GRPC_ADDR" ]]; then
+  echo "failed to start gRPC server" >&2
+  cat "$GRPC_LOG" >&2 || true
+  exit 1
+fi
+
+echo "gRPC target: $GRPC_ADDR" >&2
+
+# 1) Store the subject bytes via gRPC.
+SUBJECT_CID="$($XDAO_CASCLI_BIN put --backend grpc --grpc-target "$GRPC_ADDR" "$DOC_PATH")"
 echo "Subject CID: $SUBJECT_CID" >&2
 
 # 2) Generate local keys (random) and derive role keys used for signing.
@@ -78,7 +123,7 @@ A1_META="$WORK_DIR/a1.meta"
   --role author \
   > "$A1_CATF") 2> "$A1_META"
 A1_CID_EXPECTED="$(grep '^Attestation-CID: ' "$A1_META" | sed 's/^Attestation-CID: //')"
-A1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$A1_CATF")"
+A1_CID="$($XDAO_CASCLI_BIN put --backend grpc --grpc-target "$GRPC_ADDR" "$A1_CATF")"
 if [[ "$A1_CID" != "$A1_CID_EXPECTED" ]]; then
   echo "Attestation CID mismatch (A1): expected $A1_CID_EXPECTED, got $A1_CID" >&2
   exit 1
@@ -99,7 +144,7 @@ R1_META="$WORK_DIR/r1.meta"
   --claim "Comment=Reviewed and approved" \
   > "$R1_CATF") 2> "$R1_META"
 R1_CID_EXPECTED="$(grep '^Attestation-CID: ' "$R1_META" | sed 's/^Attestation-CID: //')"
-R1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$R1_CATF")"
+R1_CID="$($XDAO_CASCLI_BIN put --backend grpc --grpc-target "$GRPC_ADDR" "$R1_CATF")"
 if [[ "$R1_CID" != "$R1_CID_EXPECTED" ]]; then
   echo "Attestation CID mismatch (R1): expected $R1_CID_EXPECTED, got $R1_CID" >&2
   exit 1
@@ -135,14 +180,14 @@ Require:
 -----END XDAO TRUST POLICY-----
 EOF
 
-POLICY_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$POLICY_PATH")"
+POLICY_CID="$($XDAO_CASCLI_BIN put --backend grpc --grpc-target "$GRPC_ADDR" "$POLICY_PATH")"
 echo "Policy CID: $POLICY_CID" >&2
 
 # 5) Resolve purely from CIDs via CAS, render CROF bytes, store CROF bytes in CAS.
 CROF_PATH="$WORK_DIR/out.crof"
 CROF_META="$WORK_DIR/out.meta"
 if ! "$XDAO_CASCLI_BIN" resolve \
-  --cas-config "$CAS_CONFIG" --backend localfs \
+  --backend grpc --grpc-target "$GRPC_ADDR" \
   --subject "$SUBJECT_CID" \
   --policy "$POLICY_CID" \
   --att "$A1_CID" \
@@ -154,7 +199,7 @@ if ! "$XDAO_CASCLI_BIN" resolve \
 fi
 
 CROF_CID_RENDERED="$(grep '^CROF-CID: ' "$CROF_META" | sed 's/^CROF-CID: //')"
-CROF_CID_STORED="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$CROF_PATH")"
+CROF_CID_STORED="$($XDAO_CASCLI_BIN put --backend grpc --grpc-target "$GRPC_ADDR" "$CROF_PATH")"
 
 if [[ "$CROF_CID_RENDERED" != "$CROF_CID_STORED" ]]; then
   echo "CROF CID mismatch: rendered $CROF_CID_RENDERED, stored $CROF_CID_STORED" >&2
@@ -163,4 +208,4 @@ fi
 
 echo "CROF CID: $CROF_CID_STORED" >&2
 
-echo "OK: subject + policy + attestations + CROF stored in localfs CAS" >&2
+echo "OK: subject + policy + attestations + CROF stored via CAS gRPC (backed by localfs)" >&2

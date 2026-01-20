@@ -17,8 +17,6 @@ import (
 	"xdao.co/catf/storage/casconfig"
 	"xdao.co/catf/storage/casregistry"
 
-	_ "xdao.co/catf-ipfs/ipfs"
-	_ "xdao.co/catf-localfs/localfs"
 	_ "xdao.co/catf/storage/grpccas"
 )
 
@@ -58,23 +56,18 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cascli plugin install --plugin localfs|ipfs [--version vX.Y.Z] [--install-dir <dir>] [--os <goos>] [--arch <goarch>]")
 	fmt.Fprintln(w, "  cascli plugin list [--plugin <name>] [--with-latest] [--os <goos>] [--arch <goarch>] [--json]")
 	fmt.Fprintln(w, "  cascli plugin verify --plugin localfs|ipfs [--version vX.Y.Z] [--install-dir <dir> | --binary-path <path>] [--os <goos>] [--arch <goarch>]")
-	fmt.Fprintln(w, "  cascli put --backend localfs --localfs-dir <dir> <file>")
-	fmt.Fprintln(w, "  cascli put --cas-config <file.json> [--backend <preferred>] [--emit-backend-cids] <file>")
-	fmt.Fprintln(w, "  cascli get --backend localfs --localfs-dir <dir> --cid <cid> [--out <file>]")
-	fmt.Fprintln(w, "  cascli resolve --backend localfs --localfs-dir <dir> --subject <cid> --policy <cid> --att <cid> [--att ...] [--mode strict|permissive]")
 	fmt.Fprintln(w, "  cascli put --backend grpc --grpc-target <host:port> <file>")
+	fmt.Fprintln(w, "  cascli put --cas-config <file.json> [--backend <preferred>] [--emit-backend-cids] <file>")
+	fmt.Fprintln(w, "  cascli get --backend grpc --grpc-target <host:port> --cid <cid> [--out <file>]")
+	fmt.Fprintln(w, "  cascli resolve --backend grpc --grpc-target <host:port> --subject <cid> --policy <cid> --att <cid> [--att ...] [--mode strict|permissive]")
 	fmt.Fprintln(w, "  cascli resolve --backend grpc --grpc-target <host:port> ...")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "IPFS backend:")
-	fmt.Fprintln(w, "  cascli put --backend ipfs --ipfs-path <repo> [--pin=true|false] <file>")
-	fmt.Fprintln(w, "  cascli resolve --backend ipfs --ipfs-path <repo> ...")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "gRPC backend:")
 	fmt.Fprintln(w, "  cascli get --backend grpc --grpc-target <host:port> --cid <cid> [--out <file>]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Notes:")
-	fmt.Fprintln(w, "  - ipfs backend shells out to the local Kubo 'ipfs' CLI")
-	fmt.Fprintln(w, "  - grpc backend talks to xdao-casgrpcd (or any CAS gRPC server)")
+	fmt.Fprintln(w, "  - install plugin daemons via: cascli plugin install --plugin localfs|ipfs")
+	fmt.Fprintln(w, "  - grpc backend talks to a CAS gRPC server (e.g. xdao-casgrpcd-localfs)")
 	fmt.Fprintln(w, "  - cascli stores raw blocks (CIDv1 raw + sha2-256)")
 }
 
@@ -85,7 +78,7 @@ type commonFlags struct {
 }
 
 func (c *commonFlags) add(fs *flag.FlagSet) {
-	fs.StringVar(&c.backend, "backend", "localfs", "CAS backend name")
+	fs.StringVar(&c.backend, "backend", "grpc", "CAS backend name")
 	fs.BoolVar(&c.listBackends, "list-backends", false, "List supported backends and exit")
 	fs.StringVar(&c.casConfig, "cas-config", "", "Path to CAS JSON config (optional; uses casregistry OpenWithConfig)")
 	casregistry.RegisterFlags(fs, casregistry.UsageCLI)

@@ -39,9 +39,7 @@ If Flux passes policy/attestation inputs by CID (common for large artifacts), yo
 
 The core library expresses this as `xdao.co/catf/storage.CAS`.
 
-Reference CAS implementations are delivered as **plugins** (separate Go modules) and linked into your Flux worker binary as dependencies:
-
-- LocalFS plugin: `xdao.co/catf-localfs/localfs` (write-once, immutable, CID-keyed)
+For Flux-style deployments, the recommended approach is to run a CAS as a **sidecar daemon** (downloaded plugin binaries from GitHub Releases) and connect to it over gRPC.
 
 Design notes:
 
@@ -53,17 +51,15 @@ Design notes:
 Any CAS provider can integrate by implementing `xdao.co/catf/storage.CAS`.
 If you need multiple backends (e.g. local filesystem + an optional transport), compose them deterministically with `storage.MultiCAS`.
 
-Sketch:
+Sketch (single backend via gRPC):
 
 ```go
-local, _ := localfs.New("/var/lib/flux/cas")
-// transport := ipfs.New(ipfs.Options{}) // optional adapter (from xdao.co/catf-ipfs/ipfs; defaults to pin=true)
-
-// To disable pinning:
-// transport := ipfs.New(ipfs.Options{Pin: ipfs.Bool(false)})
-
-cas := storage.MultiCAS{Adapters: []storage.CAS{local /*, transport */}}
+cas, err := grpccas.Dial("127.0.0.1:7777", grpccas.DialOptions{})
+if err != nil { /* handle */ }
+defer cas.Close()
 ```
+
+If you need multiple backends, you can dial multiple daemons and compose them deterministically with `storage.MultiCAS` (slice order).
 
 ---
 
@@ -77,8 +73,9 @@ Use the stable boundary DTOs in `xdao.co/catf/model` for API/Flux integrations.
 Go example (sketch):
 
 ```go
-cas, err := localfs.New("/var/lib/flux/cas")
+cas, err := grpccas.Dial("127.0.0.1:7777", grpccas.DialOptions{})
 if err != nil { /* handle */ }
+defer cas.Close()
 
 req := model.ResolverRequest{
   SubjectCID: "bafy...",

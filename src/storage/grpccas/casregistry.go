@@ -20,7 +20,7 @@ var (
 func init() {
 	casregistry.MustRegister(casregistry.Backend{
 		Name:        "grpc",
-		Description: "gRPC CAS client (talks to xdao-casgrpcd)",
+		Description: "gRPC CAS client (talks to a CAS gRPC daemon, e.g. xdao-casgrpcd-localfs)",
 		Usage:       casregistry.UsageCLI,
 		RegisterFlags: func(fs *flag.FlagSet) {
 			fs.StringVar(&flagTarget, "grpc-target", "", "gRPC target host:port (for --backend=grpc)")

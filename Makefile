@@ -32,11 +32,11 @@ help:
 	@echo "  example-uc4-ipfs Like example-uc4, but with XDAO_USE_IPFS=1"
 	@echo "  walkthrough      Run storage walkthroughs (localfs + ipfs)"
 	@echo "  walkthrough-all  Store subject+policy+attestations+CROF in localfs + ipfs (write_policy=all)"
-	@echo "  walkthrough-localfs Store subject+policy+attestations+CROF in localfs CAS"
-	@echo "  walkthrough-ipfs Store subject+policy+attestations+CROF in local IPFS repo"
-	@echo "  walkthrough-grpc Run storage walkthroughs via CAS gRPC (localfs + ipfs)"
-	@echo "  walkthrough-grpc-localfs Same as walkthrough-localfs, but via gRPC server"
-	@echo "  walkthrough-grpc-ipfs Same as walkthrough-ipfs, but via gRPC server"
+	@echo "  walkthrough-localfs Store subject+policy+attestations+CROF via downloaded LocalFS plugin daemon (CAS gRPC)"
+	@echo "  walkthrough-ipfs Store subject+policy+attestations+CROF via downloaded IPFS plugin daemon (CAS gRPC)"
+	@echo "  walkthrough-grpc Run storage walkthroughs via downloaded plugin daemons (localfs + ipfs)"
+	@echo "  walkthrough-grpc-localfs Alias for walkthrough-localfs"
+	@echo "  walkthrough-grpc-ipfs Alias for walkthrough-ipfs"
 
 all: build test
 
@@ -113,8 +113,8 @@ walkthrough-ipfs: build build-cascli
 
 walkthrough-grpc: walkthrough-grpc-localfs walkthrough-grpc-ipfs
 
-walkthrough-grpc-localfs: build build-cascli build-casgrpcd
+walkthrough-grpc-localfs: build build-cascli
 	bash examples/walkthrough_grpccas_localfs.sh
 
-walkthrough-grpc-ipfs: build build-cascli build-casgrpcd
+walkthrough-grpc-ipfs: build build-cascli
 	bash examples/walkthrough_grpccas_ipfs.sh
