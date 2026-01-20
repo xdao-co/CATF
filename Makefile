@@ -1,4 +1,4 @@
-.PHONY: help all build build-cascli clean test test-unit test-integration fmt vet regen-conformance examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs walkthrough walkthrough-localfs walkthrough-ipfs
+.PHONY: help all build build-cascli build-casgrpcd clean test test-unit test-integration fmt vet regen-conformance examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs walkthrough walkthrough-localfs walkthrough-ipfs walkthrough-grpc walkthrough-grpc-localfs walkthrough-grpc-ipfs
 
 SHELL := /bin/bash
 
@@ -8,6 +8,7 @@ BIN_DIR := bin
 
 CATF_BIN := $(BIN_DIR)/xdao-catf
 CASCLI_BIN := $(BIN_DIR)/xdao-cascli
+CASGRPCD_BIN := $(BIN_DIR)/xdao-casgrpcd
 
 help:
 	@echo "Targets:"
@@ -32,6 +33,9 @@ help:
 	@echo "  walkthrough      Run storage walkthroughs (localfs + ipfs)"
 	@echo "  walkthrough-localfs Store subject+policy+attestations+CROF in localfs CAS"
 	@echo "  walkthrough-ipfs Store subject+policy+attestations+CROF in local IPFS repo"
+	@echo "  walkthrough-grpc Run storage walkthroughs via CAS gRPC (localfs + ipfs)"
+	@echo "  walkthrough-grpc-localfs Same as walkthrough-localfs, but via gRPC server"
+	@echo "  walkthrough-grpc-ipfs Same as walkthrough-ipfs, but via gRPC server"
 
 all: build test
 
@@ -43,6 +47,9 @@ build: $(BIN_DIR)
 
 build-cascli: $(BIN_DIR)
 	$(GO) -C "$(SRC_DIR)" build -o "../$(CASCLI_BIN)" ./internal/tools/cascli
+
+build-casgrpcd: $(BIN_DIR)
+	$(GO) -C "$(SRC_DIR)" build -o "../$(CASGRPCD_BIN)" ./cmd/xdao-casgrpcd
 
 clean:
 	@rm -rf "$(BIN_DIR)"
@@ -99,3 +106,11 @@ walkthrough-localfs: build build-cascli
 
 walkthrough-ipfs: build build-cascli
 	bash examples/walkthrough_ipfs.sh
+
+walkthrough-grpc: walkthrough-grpc-localfs walkthrough-grpc-ipfs
+
+walkthrough-grpc-localfs: build build-cascli build-casgrpcd
+	bash examples/walkthrough_grpccas_localfs.sh
+
+walkthrough-grpc-ipfs: build build-cascli build-casgrpcd
+	bash examples/walkthrough_grpccas_ipfs.sh

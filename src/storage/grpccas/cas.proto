@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package xdao.catf.storage.grpccas.v1;
+
+option go_package = "xdao.co/catf/storage/grpccas;grpccas";
+
+import "google/protobuf/wrappers.proto";
+
+// CAS is a minimal gRPC surface for the CATF storage.CAS interface.
+//
+// This service transports raw bytes. The CAS contract still applies:
+// - Put is idempotent and returns CIDv1(raw, sha2-256) for the bytes.
+// - Get returns bytes that hash to the requested CID or errors.
+// - Has is best-effort.
+service CAS {
+  // Put stores bytes and returns the CID.
+  rpc Put(google.protobuf.BytesValue) returns (google.protobuf.StringValue);
+
+  // Get fetches bytes by CID.
+  rpc Get(google.protobuf.StringValue) returns (google.protobuf.BytesValue);
+
+  // Has returns whether the CID is present.
+  rpc Has(google.protobuf.StringValue) returns (google.protobuf.BoolValue);
+}

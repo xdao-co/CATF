@@ -9,11 +9,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ipfs/go-cid"
 
 	"xdao.co/catf/model"
 	"xdao.co/catf/storage"
+	"xdao.co/catf/storage/grpccas"
 	"xdao.co/catf/storage/ipfs"
 	"xdao.co/catf/storage/localfs"
 )
@@ -52,13 +54,19 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  cascli put --backend localfs --localfs-dir <dir> <file>")
 	fmt.Fprintln(w, "  cascli get --backend localfs --localfs-dir <dir> --cid <cid> [--out <file>]")
 	fmt.Fprintln(w, "  cascli resolve --backend localfs --localfs-dir <dir> --subject <cid> --policy <cid> --att <cid> [--att ...] [--mode strict|permissive]")
+	fmt.Fprintln(w, "  cascli put --backend grpc --grpc-target <host:port> <file>")
+	fmt.Fprintln(w, "  cascli resolve --backend grpc --grpc-target <host:port> ...")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "IPFS backend:")
 	fmt.Fprintln(w, "  cascli put --backend ipfs --ipfs-path <repo> [--pin=true|false] <file>")
 	fmt.Fprintln(w, "  cascli resolve --backend ipfs --ipfs-path <repo> ...")
 	fmt.Fprintln(w)
+	fmt.Fprintln(w, "gRPC backend:")
+	fmt.Fprintln(w, "  cascli get --backend grpc --grpc-target <host:port> --cid <cid> [--out <file>]")
+	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Notes:")
 	fmt.Fprintln(w, "  - ipfs backend shells out to the local Kubo 'ipfs' CLI")
+	fmt.Fprintln(w, "  - grpc backend talks to xdao-casgrpcd (or any CAS gRPC server)")
 	fmt.Fprintln(w, "  - cascli stores raw blocks (CIDv1 raw + sha2-256)")
 }
 
@@ -68,30 +76,41 @@ type commonFlags struct {
 	ipfsPath   string
 	ipfsBin    string
 	pinFlagRaw string
+
+	grpcTarget      string
+	grpcDialTimeout time.Duration
+	grpcTimeout     time.Duration
+	grpcMaxMsgBytes int
 }
 
 func (c *commonFlags) add(fs *flag.FlagSet) {
-	fs.StringVar(&c.backend, "backend", "localfs", "CAS backend: localfs|ipfs")
+	fs.StringVar(&c.backend, "backend", "localfs", "CAS backend: localfs|ipfs|grpc")
 	fs.StringVar(&c.localDir, "localfs-dir", "", "LocalFS CAS directory (for --backend=localfs)")
 	fs.StringVar(&c.ipfsPath, "ipfs-path", "", "IPFS repo path (sets IPFS_PATH; for --backend=ipfs)")
 	fs.StringVar(&c.ipfsBin, "ipfs-bin", "", "Path to ipfs binary (optional; defaults to 'ipfs')")
 	fs.StringVar(&c.pinFlagRaw, "pin", "", "Pin blocks when writing (for --backend=ipfs). If omitted, backend default applies")
+
+	fs.StringVar(&c.grpcTarget, "grpc-target", "", "gRPC target host:port (for --backend=grpc)")
+	fs.DurationVar(&c.grpcDialTimeout, "grpc-dial-timeout", 5*time.Second, "Dial timeout (for --backend=grpc)")
+	fs.DurationVar(&c.grpcTimeout, "grpc-timeout", 0, "Per-RPC timeout (for --backend=grpc)")
+	fs.IntVar(&c.grpcMaxMsgBytes, "grpc-max-msg-bytes", 0, "Max gRPC message size in bytes (send+recv); 0 uses grpc defaults")
 }
 
-func (c *commonFlags) openCAS() (storage.CAS, error) {
+func (c *commonFlags) openCAS() (storage.CAS, func() error, error) {
 	switch c.backend {
 	case "localfs":
 		if c.localDir == "" {
-			return nil, fmt.Errorf("missing --localfs-dir")
+			return nil, nil, fmt.Errorf("missing --localfs-dir")
 		}
-		return localfs.New(c.localDir)
+		cas, err := localfs.New(c.localDir)
+		return cas, nil, err
 	case "ipfs":
 		bin := c.ipfsBin
 		if bin == "" {
 			bin = "ipfs"
 		}
 		if _, err := exec.LookPath(bin); err != nil {
-			return nil, fmt.Errorf("ipfs not found on PATH (or at --ipfs-bin): %w", err)
+			return nil, nil, fmt.Errorf("ipfs not found on PATH (or at --ipfs-bin): %w", err)
 		}
 		env := os.Environ()
 		if c.ipfsPath != "" {
@@ -106,12 +125,22 @@ func (c *commonFlags) openCAS() (storage.CAS, error) {
 			case "false", "0", "no", "n":
 				opts.Pin = ipfs.Bool(false)
 			default:
-				return nil, fmt.Errorf("invalid --pin: %q", c.pinFlagRaw)
+				return nil, nil, fmt.Errorf("invalid --pin: %q", c.pinFlagRaw)
 			}
 		}
-		return ipfs.New(opts), nil
+		return ipfs.New(opts), nil, nil
+	case "grpc":
+		if strings.TrimSpace(c.grpcTarget) == "" {
+			return nil, nil, fmt.Errorf("missing --grpc-target")
+		}
+		client, err := grpccas.Dial(strings.TrimSpace(c.grpcTarget), grpccas.DialOptions{Timeout: c.grpcDialTimeout, MaxMsgBytes: c.grpcMaxMsgBytes})
+		if err != nil {
+			return nil, nil, err
+		}
+		client.Timeout = c.grpcTimeout
+		return client, client.Close, nil
 	default:
-		return nil, fmt.Errorf("unknown --backend: %s", c.backend)
+		return nil, nil, fmt.Errorf("unknown --backend: %s", c.backend)
 	}
 }
 
@@ -128,10 +157,13 @@ func cmdPut(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
-	cas, err := common.openCAS()
+	cas, closeFn, err := common.openCAS()
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return 1
+	}
+	if closeFn != nil {
+		defer closeFn()
 	}
 
 	p := fs.Arg(0)
@@ -172,10 +204,13 @@ func cmdGet(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
-	cas, err := common.openCAS()
+	cas, closeFn, err := common.openCAS()
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return 1
+	}
+	if closeFn != nil {
+		defer closeFn()
 	}
 
 	id, err := cid.Decode(cidStr)
@@ -224,10 +259,13 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
-	cas, err := common.openCAS()
+	cas, closeFn, err := common.openCAS()
 	if err != nil {
 		fmt.Fprintln(errOut, err)
 		return 1
+	}
+	if closeFn != nil {
+		defer closeFn()
 	}
 
 	compliance := model.ComplianceStrict
