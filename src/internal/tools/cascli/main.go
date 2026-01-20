@@ -6,18 +6,18 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/ipfs/go-cid"
 
 	"xdao.co/catf/model"
 	"xdao.co/catf/storage"
-	"xdao.co/catf/storage/grpccas"
-	"xdao.co/catf/storage/ipfs"
-	"xdao.co/catf/storage/localfs"
+	"xdao.co/catf/storage/casregistry"
+
+	_ "xdao.co/catf/storage/grpccas"
+	_ "xdao.co/catf/storage/ipfs"
+	_ "xdao.co/catf/storage/localfs"
 )
 
 func main() {
@@ -71,76 +71,27 @@ func printUsage(w io.Writer) {
 }
 
 type commonFlags struct {
-	backend    string
-	localDir   string
-	ipfsPath   string
-	ipfsBin    string
-	pinFlagRaw string
-
-	grpcTarget      string
-	grpcDialTimeout time.Duration
-	grpcTimeout     time.Duration
-	grpcMaxMsgBytes int
+	backend      string
+	listBackends bool
 }
 
 func (c *commonFlags) add(fs *flag.FlagSet) {
-	fs.StringVar(&c.backend, "backend", "localfs", "CAS backend: localfs|ipfs|grpc")
-	fs.StringVar(&c.localDir, "localfs-dir", "", "LocalFS CAS directory (for --backend=localfs)")
-	fs.StringVar(&c.ipfsPath, "ipfs-path", "", "IPFS repo path (sets IPFS_PATH; for --backend=ipfs)")
-	fs.StringVar(&c.ipfsBin, "ipfs-bin", "", "Path to ipfs binary (optional; defaults to 'ipfs')")
-	fs.StringVar(&c.pinFlagRaw, "pin", "", "Pin blocks when writing (for --backend=ipfs). If omitted, backend default applies")
-
-	fs.StringVar(&c.grpcTarget, "grpc-target", "", "gRPC target host:port (for --backend=grpc)")
-	fs.DurationVar(&c.grpcDialTimeout, "grpc-dial-timeout", 5*time.Second, "Dial timeout (for --backend=grpc)")
-	fs.DurationVar(&c.grpcTimeout, "grpc-timeout", 0, "Per-RPC timeout (for --backend=grpc)")
-	fs.IntVar(&c.grpcMaxMsgBytes, "grpc-max-msg-bytes", 0, "Max gRPC message size in bytes (send+recv); 0 uses grpc defaults")
+	fs.StringVar(&c.backend, "backend", "localfs", "CAS backend name")
+	fs.BoolVar(&c.listBackends, "list-backends", false, "List supported backends and exit")
+	casregistry.RegisterFlags(fs, casregistry.UsageCLI)
 }
 
 func (c *commonFlags) openCAS() (storage.CAS, func() error, error) {
-	switch c.backend {
-	case "localfs":
-		if c.localDir == "" {
-			return nil, nil, fmt.Errorf("missing --localfs-dir")
-		}
-		cas, err := localfs.New(c.localDir)
-		return cas, nil, err
-	case "ipfs":
-		bin := c.ipfsBin
-		if bin == "" {
-			bin = "ipfs"
-		}
-		if _, err := exec.LookPath(bin); err != nil {
-			return nil, nil, fmt.Errorf("ipfs not found on PATH (or at --ipfs-bin): %w", err)
-		}
-		env := os.Environ()
-		if c.ipfsPath != "" {
-			env = append(env, "IPFS_PATH="+c.ipfsPath)
-		}
+	return casregistry.Open(c.backend, casregistry.UsageCLI)
+}
 
-		opts := ipfs.Options{Bin: bin, Env: env}
-		if c.pinFlagRaw != "" {
-			switch strings.ToLower(strings.TrimSpace(c.pinFlagRaw)) {
-			case "true", "1", "yes", "y":
-				opts.Pin = ipfs.Bool(true)
-			case "false", "0", "no", "n":
-				opts.Pin = ipfs.Bool(false)
-			default:
-				return nil, nil, fmt.Errorf("invalid --pin: %q", c.pinFlagRaw)
-			}
+func printBackends(w io.Writer) {
+	for _, b := range casregistry.List(casregistry.UsageCLI) {
+		if b.Description == "" {
+			_, _ = fmt.Fprintf(w, "%s\n", b.Name)
+			continue
 		}
-		return ipfs.New(opts), nil, nil
-	case "grpc":
-		if strings.TrimSpace(c.grpcTarget) == "" {
-			return nil, nil, fmt.Errorf("missing --grpc-target")
-		}
-		client, err := grpccas.Dial(strings.TrimSpace(c.grpcTarget), grpccas.DialOptions{Timeout: c.grpcDialTimeout, MaxMsgBytes: c.grpcMaxMsgBytes})
-		if err != nil {
-			return nil, nil, err
-		}
-		client.Timeout = c.grpcTimeout
-		return client, client.Close, nil
-	default:
-		return nil, nil, fmt.Errorf("unknown --backend: %s", c.backend)
+		_, _ = fmt.Fprintf(w, "%s\t%s\n", b.Name, b.Description)
 	}
 }
 
@@ -151,6 +102,10 @@ func cmdPut(args []string, out io.Writer, errOut io.Writer) int {
 	common.add(fs)
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if common.listBackends {
+		printBackends(out)
+		return 0
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(errOut, "usage: cascli put [common flags] <file>")
@@ -194,6 +149,10 @@ func cmdGet(args []string, out io.Writer, errOut io.Writer) int {
 
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if common.listBackends {
+		printBackends(out)
+		return 0
 	}
 	if cidStr == "" {
 		fmt.Fprintln(errOut, "missing --cid")
@@ -253,6 +212,10 @@ func cmdResolve(args []string, out io.Writer, errOut io.Writer) int {
 
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if common.listBackends {
+		printBackends(out)
+		return 0
 	}
 	if subjectCID == "" || policyCID == "" || len(atts) == 0 {
 		fmt.Fprintln(errOut, "usage: cascli resolve [common flags] --subject <cid> --policy <cid> --att <cid> [--att ...] [--mode strict|permissive]")
