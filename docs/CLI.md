@@ -126,6 +126,31 @@ SUBJECT_CID="$(go run ./cmd/xdao-catf doc-cid ../examples/whitepaper.txt)"
 
 CAS operations (put/get/resolve-by-CID) are handled by the separate CAS CLI (`xdao-cascli`), which uses plugin backends.
 
+#### Installing CAS plugins (downloadable daemons)
+
+If you want to use a CAS backend **without recompiling CATF**, install the backend’s standalone CAS gRPC daemon from GitHub Releases.
+This downloads the correct archive for your infrastructure (defaults to the current `GOOS/GOARCH`) and installs the daemon into an install directory (default `~/.local/bin`).
+
+Install the latest release for your platform:
+
+```sh
+./bin/xdao-cascli plugin install --plugin localfs
+./bin/xdao-cascli plugin install --plugin ipfs
+```
+
+Install a specific version and/or target platform:
+
+```sh
+./bin/xdao-cascli plugin install --plugin localfs --version v1.2.3 --os linux --arch amd64 --install-dir /usr/local/bin
+```
+
+Once installed, run the daemon and use the `grpc` backend:
+
+```sh
+xdao-casgrpcd-localfs --listen 127.0.0.1:7777 --backend localfs --localfs-dir /tmp/cas
+./bin/xdao-cascli put --backend grpc --grpc-target 127.0.0.1:7777 ./examples/whitepaper.txt
+```
+
 To store bytes into a local IPFS repo (no daemon required), use the IPFS CAS plugin:
 
 ```sh

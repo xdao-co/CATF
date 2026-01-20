@@ -33,6 +33,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	switch args[0] {
+	case "plugin":
+		return cmdPlugin(args[1:], out, errOut)
 	case "put":
 		return cmdPut(args[1:], out, errOut)
 	case "get":
@@ -53,6 +55,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "cascli: minimal CAS tool for walkthroughs")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  cascli plugin install --plugin localfs|ipfs [--version vX.Y.Z] [--install-dir <dir>] [--os <goos>] [--arch <goarch>]")
 	fmt.Fprintln(w, "  cascli put --backend localfs --localfs-dir <dir> <file>")
 	fmt.Fprintln(w, "  cascli put --cas-config <file.json> [--backend <preferred>] [--emit-backend-cids] <file>")
 	fmt.Fprintln(w, "  cascli get --backend localfs --localfs-dir <dir> --cid <cid> [--out <file>]")
