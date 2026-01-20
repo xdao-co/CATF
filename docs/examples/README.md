@@ -26,6 +26,27 @@ make walkthrough-localfs
 make walkthrough-ipfs
 ```
 
+### Optional: CAS gRPC transport demos
+
+These variants run the same “store everything in a CAS” lifecycle, but route all CAS operations through the CAS gRPC protocol.
+
+This is a reference way to demonstrate “CAS compliant storage” over a network boundary:
+
+- A backend CAS implementation is exposed via `./bin/xdao-casgrpcd`
+- The client side uses `./bin/xdao-cascli --backend grpc --grpc-target ...`
+
+LocalFS backend via gRPC:
+
+```sh
+make walkthrough-grpc-localfs
+```
+
+IPFS backend via gRPC (optional; requires Kubo `ipfs` on PATH):
+
+```sh
+make walkthrough-grpc-ipfs
+```
+
 To run both:
 
 ```sh

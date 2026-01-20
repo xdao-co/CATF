@@ -9,10 +9,11 @@ This walkthrough demonstrates the complete CATF lifecycle:
 5) Resolve deterministically (CROF)
 6) Store **all artifacts** (subject, policy, attestations, CROF) in a **content-addressable store (CAS)**
 
-Two backends are demonstrated:
+Three CAS paths are demonstrated:
 
 - **Local filesystem CAS** (fully offline, no external tools)
 - **Local IPFS repo CAS** (optional; requires Kubo `ipfs`)
+- **CAS gRPC transport** (optional; wraps either LocalFS or IPFS behind a gRPC boundary)
 
 The runnable entrypoints are Makefile targets.
 
@@ -43,10 +44,28 @@ Run the IPFS walkthrough (optional):
 make walkthrough-ipfs
 ```
 
+Run the same demo through the CAS gRPC interface (LocalFS backend):
+
+```sh
+make walkthrough-grpc-localfs
+```
+
+Run the same demo through the CAS gRPC interface (IPFS backend; optional):
+
+```sh
+make walkthrough-grpc-ipfs
+```
+
 Run both:
 
 ```sh
 make walkthrough
+```
+
+Run both gRPC variants:
+
+```sh
+make walkthrough-grpc
 ```
 
 ---
@@ -92,11 +111,18 @@ If everything worked, the script ends with:
 
 - LocalFS walkthrough script: `examples/walkthrough_localfs.sh`
 - IPFS walkthrough script: `examples/walkthrough_ipfs.sh`
+- LocalFS-via-gRPC walkthrough script: `examples/walkthrough_grpccas_localfs.sh`
+- IPFS-via-gRPC walkthrough script: `examples/walkthrough_grpccas_ipfs.sh`
 
 They use:
 
 - `./bin/xdao-catf` to generate keys and attestations
 - `./bin/xdao-cascli` to put/get/resolve against a selected CAS backend
+
+The gRPC variants additionally use:
+
+- `./bin/xdao-casgrpcd` to expose a CAS backend (LocalFS or IPFS) over the CAS gRPC protocol
+- `xdao-cascli --backend grpc --grpc-target <host:port>` to exercise the exact same flow through the network boundary
 
 Internally, `xdao-cascli` performs the “resolve from CIDs” step via the public Go API:
 

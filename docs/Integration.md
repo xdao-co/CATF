@@ -65,6 +65,11 @@ The core library expresses this as a small interface (`xdao.co/catf/storage.CAS`
 
 - Local filesystem CAS: `xdao.co/catf/storage/localfs`
 
+It also ships an optional **CAS gRPC transport** layer that can expose any `storage.CAS` implementation over a gRPC boundary:
+
+- gRPC protocol + client/server adapters: `xdao.co/catf/storage/grpccas`
+- Reference daemon (wraps LocalFS or IPFS and serves gRPC): `./bin/xdao-casgrpcd`
+
 Design note:
 
 - Reachability is not validity. Whether bytes came from a database, filesystem, or IPFS transport, the bytes MUST be verified against the CID (hash mismatch must be treated as an error).
@@ -90,6 +95,39 @@ Contract requirements:
 - Stored objects MUST be immutable.
 - `Get` MUST return `storage.ErrNotFound` when absent.
 - `Get` SHOULD validate that returned bytes hash to the requested CID and return `storage.ErrCIDMismatch` on mismatch.
+
+#### Optional: “CAS compliant storage” over gRPC
+
+If you want to integrate a CAS provider across a process boundary (or prove that an implementation stays correct when accessed remotely), the `grpccas` package provides a minimal gRPC surface that matches `storage.CAS`.
+
+Server-side (expose an existing CAS over gRPC):
+
+```go
+backendCAS, _ := localfs.New("/var/lib/xdao/cas")
+
+s := grpc.NewServer()
+grpccas.RegisterCASServer(s, &grpccas.Server{CAS: backendCAS})
+// net.Listen + s.Serve(lis)
+```
+
+Client-side (use a remote CAS as a `storage.CAS` implementation):
+
+```go
+cas, err := grpccas.Dial("127.0.0.1:7777", grpccas.DialOptions{})
+if err != nil { /* ... */ }
+defer cas.Close()
+
+id, err := cas.Put([]byte("hello"))
+_ = id
+```
+
+Reference CLI demo:
+
+```sh
+make walkthrough-grpc-localfs
+```
+
+This starts `xdao-casgrpcd` (LocalFS backend) and runs the standard “store everything” lifecycle through `xdao-cascli --backend grpc`.
 
 #### Composing multiple providers (deterministic)
 

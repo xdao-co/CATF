@@ -20,6 +20,8 @@ type CAS struct {
 	root string
 }
 
+var _ storage.CAS = (*CAS)(nil)
+
 // New constructs a filesystem CAS rooted at root. The directory will be created if needed.
 func New(root string) (*CAS, error) {
 	if root == "" {

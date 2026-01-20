@@ -39,6 +39,18 @@ Optional (requires Kubo `ipfs` on PATH):
 make walkthrough-ipfs
 ```
 
+You can also run the same “store everything” demo through the **CAS gRPC interface** (a reference way to prove a backend is “CAS-compliant” over the network boundary). This starts a local gRPC server and then runs the same flow through a gRPC client:
+
+```sh
+make walkthrough-grpc-localfs
+```
+
+Optional (requires Kubo `ipfs` on PATH):
+
+```sh
+make walkthrough-grpc-ipfs
+```
+
 Details: `docs/Walkthrough_Storage.md`.
 
 ## Commands

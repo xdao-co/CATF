@@ -10,6 +10,8 @@
 - Flux integration: [docs/FluxIntegration.md](docs/FluxIntegration.md)
 - End-to-end workflows: [docs/UseCases.md](docs/UseCases.md)
 - Full process walkthrough (store everything in CAS): [docs/Walkthrough_Storage.md](docs/Walkthrough_Storage.md)
+- CAS gRPC transport demo (LocalFS/IPFS via gRPC): see [docs/Walkthrough_Storage.md](docs/Walkthrough_Storage.md) (targets: `make walkthrough-grpc-localfs`, `make walkthrough-grpc-ipfs`)
+- Extending gRPC CAS storage (pluggable modules): [docs/Extending_GRPCCAS_Storage.md](docs/Extending_GRPCCAS_Storage.md)
 - Runnable scripts: [docs/examples/README.md](docs/examples/README.md)
 
 ## Glossary

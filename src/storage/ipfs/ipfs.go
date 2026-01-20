@@ -37,6 +37,8 @@ type CAS struct {
 	pin bool
 }
 
+var _ storage.CAS = (*CAS)(nil)
+
 type Options struct {
 	// Bin is the path to the ipfs binary. If empty, "ipfs" is used.
 	Bin string
