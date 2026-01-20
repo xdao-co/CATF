@@ -9,8 +9,8 @@ require (
 	golang.org/x/crypto v0.30.0
 	google.golang.org/grpc v1.67.0
 	google.golang.org/protobuf v1.35.2
-	xdao.co/catf-ipfs v0.0.0
-	xdao.co/catf-localfs v0.0.0
+	xdao.co/catf-ipfs v1.0.1
+	xdao.co/catf-localfs v1.0.1
 )
 
 require (
@@ -28,7 +28,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
 	lukechampine.com/blake3 v1.1.6 // indirect
 )
-
-replace xdao.co/catf-ipfs => ../../CATF-ipfs
-
-replace xdao.co/catf-localfs => ../../CATF-localfs
