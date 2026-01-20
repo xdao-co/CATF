@@ -23,6 +23,16 @@ CAS_DIR="$WORK_DIR/cas"
 HOME_DIR="$WORK_DIR/home"
 mkdir -p "$CAS_DIR" "$HOME_DIR"
 
+CAS_CONFIG="$WORK_DIR/cas.localfs.json"
+cat >"$CAS_CONFIG" <<EOF
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "localfs", "config": {"localfs-dir": "$CAS_DIR"}}
+  ]
+}
+EOF
+
 cleanup() {
   status=$?
   if [[ -n "${XDAO_KEEP_WORKDIR:-}" || $status -ne 0 ]]; then
@@ -39,9 +49,10 @@ DOC_PATH="$REPO_ROOT/examples/whitepaper.txt"
 
 echo "Work dir: $WORK_DIR" >&2
 echo "LocalFS CAS dir: $CAS_DIR" >&2
+echo "CAS config: $CAS_CONFIG" >&2
 
 # 1) Store the subject bytes in localfs CAS.
-SUBJECT_CID="$($XDAO_CASCLI_BIN put --backend localfs --localfs-dir "$CAS_DIR" "$DOC_PATH")"
+SUBJECT_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$DOC_PATH")"
 echo "Subject CID: $SUBJECT_CID" >&2
 
 # 2) Generate local keys (random) and derive role keys used for signing.
@@ -67,7 +78,7 @@ A1_META="$WORK_DIR/a1.meta"
   --role author \
   > "$A1_CATF") 2> "$A1_META"
 A1_CID_EXPECTED="$(grep '^Attestation-CID: ' "$A1_META" | sed 's/^Attestation-CID: //')"
-A1_CID="$($XDAO_CASCLI_BIN put --backend localfs --localfs-dir "$CAS_DIR" "$A1_CATF")"
+A1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$A1_CATF")"
 if [[ "$A1_CID" != "$A1_CID_EXPECTED" ]]; then
   echo "Attestation CID mismatch (A1): expected $A1_CID_EXPECTED, got $A1_CID" >&2
   exit 1
@@ -88,7 +99,7 @@ R1_META="$WORK_DIR/r1.meta"
   --claim "Comment=Reviewed and approved" \
   > "$R1_CATF") 2> "$R1_META"
 R1_CID_EXPECTED="$(grep '^Attestation-CID: ' "$R1_META" | sed 's/^Attestation-CID: //')"
-R1_CID="$($XDAO_CASCLI_BIN put --backend localfs --localfs-dir "$CAS_DIR" "$R1_CATF")"
+R1_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$R1_CATF")"
 if [[ "$R1_CID" != "$R1_CID_EXPECTED" ]]; then
   echo "Attestation CID mismatch (R1): expected $R1_CID_EXPECTED, got $R1_CID" >&2
   exit 1
@@ -124,14 +135,14 @@ Require:
 -----END XDAO TRUST POLICY-----
 EOF
 
-POLICY_CID="$($XDAO_CASCLI_BIN put --backend localfs --localfs-dir "$CAS_DIR" "$POLICY_PATH")"
+POLICY_CID="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$POLICY_PATH")"
 echo "Policy CID: $POLICY_CID" >&2
 
 # 5) Resolve purely from CIDs via CAS, render CROF bytes, store CROF bytes in CAS.
 CROF_PATH="$WORK_DIR/out.crof"
 CROF_META="$WORK_DIR/out.meta"
 if ! "$XDAO_CASCLI_BIN" resolve \
-  --backend localfs --localfs-dir "$CAS_DIR" \
+  --cas-config "$CAS_CONFIG" --backend localfs \
   --subject "$SUBJECT_CID" \
   --policy "$POLICY_CID" \
   --att "$A1_CID" \
@@ -143,7 +154,7 @@ if ! "$XDAO_CASCLI_BIN" resolve \
 fi
 
 CROF_CID_RENDERED="$(grep '^CROF-CID: ' "$CROF_META" | sed 's/^CROF-CID: //')"
-CROF_CID_STORED="$($XDAO_CASCLI_BIN put --backend localfs --localfs-dir "$CAS_DIR" "$CROF_PATH")"
+CROF_CID_STORED="$($XDAO_CASCLI_BIN put --cas-config "$CAS_CONFIG" --backend localfs "$CROF_PATH")"
 
 if [[ "$CROF_CID_RENDERED" != "$CROF_CID_STORED" ]]; then
   echo "CROF CID mismatch: rendered $CROF_CID_RENDERED, stored $CROF_CID_STORED" >&2

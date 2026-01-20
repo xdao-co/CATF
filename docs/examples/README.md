@@ -100,4 +100,7 @@ If you want the scripts to also store the subject bytes into a local IPFS repo (
 XDAO_USE_IPFS=1 ./examples/usecase1_document_publishing.sh
 ```
 
-This switches subject CID creation to `xdao-catf ipfs put --init ...`.
+This switches subject CID creation to:
+
+- `ipfs init` (under the script’s temporary `HOME`), then
+- `xdao-cascli put --backend ipfs --ipfs-path "$HOME/.ipfs" ...`

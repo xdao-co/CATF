@@ -36,6 +36,8 @@ IPFS_REPO="$WORK_DIR/ipfsrepo"
 HOME_DIR="$WORK_DIR/home"
 mkdir -p "$IPFS_REPO" "$HOME_DIR"
 
+CAS_CONFIG="$WORK_DIR/cas.ipfs.json"
+
 GRPC_LOG="$WORK_DIR/casgrpcd.log"
 GRPC_PID=""
 GRPC_ADDR=""
@@ -71,11 +73,22 @@ if [[ ! -f "$IPFS_REPO/config" ]]; then
   IPFS_PATH="$IPFS_REPO" ipfs init >/dev/null
 fi
 
+cat >"$CAS_CONFIG" <<EOF
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "ipfs", "config": {"ipfs-path": "$IPFS_REPO", "pin": "true"}}
+  ]
+}
+EOF
+
+echo "CAS config: $CAS_CONFIG" >&2
+
 # Start a CAS gRPC daemon exposing the local IPFS repo.
 "$XDAO_CASGRPCD_BIN" \
   --listen 127.0.0.1:0 \
   --backend ipfs \
-  --ipfs-path "$IPFS_REPO" \
+  --cas-config "$CAS_CONFIG" \
   2>"$GRPC_LOG" &
 GRPC_PID=$!
 

@@ -52,9 +52,12 @@ Note: CATF/CROF workflows assume the repo’s CID contract (`CIDv1 raw + sha2-25
 
 ## 3) Implement a new CAS backend (example skeleton)
 
-Create a new package (either inside this repo or in your own Go module).
+Create a new package in your own Go module (recommended), then register it as a **CAS plugin** via `storage/casregistry`.
 
-Example: `xdao.co/catf/storage/mycas` (your code):
+Example module layout:
+
+- `xdao.co/catf-mykv/mykv` (implements `storage.CAS`)
+- `xdao.co/catf-mykv/mykv/casregistry.go` (registers the plugin)
 
 ```go
 package mycas
@@ -138,7 +141,43 @@ func (c *CAS) Has(id cid.Cid) bool {
 }
 ```
 
-If you add this inside the repo, consider adding `storage/testkit` conformance coverage.
+Add `storage/testkit` conformance coverage in your plugin repo (recommended).
+
+### Register as a plugin (casregistry)
+
+In your plugin package, register in `init()`:
+
+```go
+package mykv
+
+import (
+  "flag"
+
+  "xdao.co/catf/storage"
+  "xdao.co/catf/storage/casregistry"
+)
+
+func init() {
+  casregistry.Register(casregistry.Backend{
+    Name:        "mykv",
+    Description: "my custom CAS backend",
+    Usages:      casregistry.UsageCLI | casregistry.UsageDaemon,
+    RegisterFlags: func(fs *flag.FlagSet, usage casregistry.Usage) {
+      // define --mykv-* flags here (optional)
+    },
+    OpenWithConfig: func(cfg map[string]string) (storage.CAS, func() error, error) {
+      // read cfg keys and return your backend
+      return NewFromConfig(cfg)
+    },
+  })
+}
+```
+
+To make the plugin available in a binary, add a blank import in that binary:
+
+```go
+import _ "xdao.co/catf-mykv/mykv"
+```
 
 ---
 
@@ -171,6 +210,12 @@ Example:
 ./bin/xdao-casgrpcd --listen 127.0.0.1:7777 --backend localfs --localfs-dir /tmp/xdao-cas
 ```
 
+Config-driven (runtime selection/composition):
+
+```sh
+./bin/xdao-casgrpcd --listen 127.0.0.1:7777 --cas-config ./cas.json --backend localfs
+```
+
 ---
 
 ## 5) Consume a remote backend as a local `storage.CAS`
@@ -191,10 +236,13 @@ _ = id
 
 ## 6) Verification: are LocalFS and IPFS “plugins”?
 
-Yes.
+Yes. In the current architecture, LocalFS and IPFS backends are delivered as external plugin modules:
 
-- LocalFS backend lives in `xdao.co/catf/storage/localfs` and implements `storage.CAS`.
-- IPFS backend lives in `xdao.co/catf/storage/ipfs` and implements `storage.CAS`.
+- LocalFS: `xdao.co/catf-localfs/localfs`
+- IPFS (Kubo CLI adapter): `xdao.co/catf-ipfs/ipfs`
+
+They register themselves with `storage/casregistry` in `init()`.
+CATF binaries link them in via blank imports, and select them at runtime via flags or JSON config.
 
 Because they implement the common interface, they are interchangeable in:
 

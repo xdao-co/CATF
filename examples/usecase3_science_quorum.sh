@@ -10,6 +10,8 @@ if [[ ! -x "$XDAO_CATF_BIN" ]]; then
   exit 1
 fi
 
+XDAO_CASCLI_BIN="$REPO_ROOT/bin/xdao-cascli"
+
 HOME_DIR="$(mktemp -d /tmp/xdao-home.XXXXXX)"
 export HOME="$HOME_DIR"
 
@@ -27,7 +29,19 @@ ai_a_key="$("$XDAO_CATF_BIN" key export --name ai-model-a --role ai-reviewer)"
 ai_b_key="$("$XDAO_CATF_BIN" key export --name ai-model-b --role ai-reviewer)"
 
 if [[ -n "${XDAO_USE_IPFS:-}" ]]; then
-  SUBJECT_CID="$("$XDAO_CATF_BIN" ipfs put --init "$REPO_ROOT/examples/whitepaper.txt")"
+  if [[ ! -x "$XDAO_CASCLI_BIN" ]]; then
+    echo "Missing $XDAO_CASCLI_BIN" >&2
+    echo "Run: make build" >&2
+    exit 1
+  fi
+
+  if ! command -v ipfs >/dev/null 2>&1; then
+    echo "ipfs not found on PATH (install Kubo 'ipfs' CLI)" >&2
+    exit 1
+  fi
+  ipfs init >/dev/null
+
+  SUBJECT_CID="$("$XDAO_CASCLI_BIN" put --backend ipfs --ipfs-path "$HOME/.ipfs" "$REPO_ROOT/examples/whitepaper.txt")"
 else
   SUBJECT_CID="$("$XDAO_CATF_BIN" doc-cid "$REPO_ROOT/examples/whitepaper.txt")"
 fi

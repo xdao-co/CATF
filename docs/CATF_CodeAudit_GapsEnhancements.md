@@ -59,8 +59,9 @@ Evidence in repo:
 - `src/storage/cas.go` (core CAS interface)
 - `src/storage/errors.go` (stable storage errors)
 - `src/storage/multi.go` (deterministic adapter composition)
-- `src/storage/localfs/localfs.go` (offline, write-once filesystem CAS)
-- `src/storage/ipfs/ipfs.go` (optional IPFS adapter; shells out to local `ipfs` CLI)
+- `src/storage/casregistry/*` (CAS plugin registry + flag/config opening)
+- LocalFS CAS plugin: `xdao.co/catf-localfs/localfs`
+- IPFS CAS plugin: `xdao.co/catf-ipfs/ipfs`
 - `src/storage/testkit/cas.go` (conformance harness)
 
 **Required fixes:**
@@ -79,25 +80,25 @@ Evidence in repo:
 **Status:**
 
 - Core CAS interface: Implemented
-- Local filesystem CAS: Implemented
+- Local filesystem CAS: Implemented (plugin)
 - Optional adapters:
-  - IPFS: Implemented (`src/storage/ipfs`)
+  - IPFS: Implemented (plugin)
   - HTTP mirror: Not implemented (optional)
   - Bundle/archive: Not implemented (optional)
 
 **Concrete deliverables (suggested paths):**
 
 - `src/storage/cas.go`
-- `src/storage/localfs/localfs.go`
-- `src/storage/ipfs/ipfs.go` (optional)
+- LocalFS CAS plugin module (recommended): `xdao.co/catf-localfs/localfs`
+- IPFS CAS plugin module (recommended): `xdao.co/catf-ipfs/ipfs` (optional)
 - `src/storage/httpmirror/httpmirror.go` (optional)
 - `src/storage/bundle/bundle.go` (optional)
 
 **Tests to add:**
 
 - Deterministic CAS conformance tests: `Put/Get` roundtrip and hash mismatch detection
-- LocalFS immutability test (write-once semantics)
-- Optional: IPFS adapter conformance test (skipped by default; runnable when `ipfs` is available)
+- LocalFS immutability test (write-once semantics) (in plugin repo)
+- Optional: IPFS adapter conformance test (skipped by default; runnable when `ipfs` is available) (in plugin repo)
 
 ---
 
@@ -243,7 +244,7 @@ To keep the CATF/CID contract intact **and** eliminate reliance on a non-self-co
 
 ### Optional transports (MAY)
 
-1. IPFS adapter (best-effort publish/fetch; verify bytes) — implemented (`src/storage/ipfs`)
+1. IPFS adapter (best-effort publish/fetch; verify bytes) — implemented as plugin (`xdao.co/catf-ipfs/ipfs`)
 2. HTTP mirror adapter (best-effort; verify bytes)
 3. Offline bundle adapter
 
@@ -256,7 +257,7 @@ To keep the CATF/CID contract intact **and** eliminate reliance on a non-self-co
 You are “library complete” for the next step when:
 
 - [x] `storage.CAS` exists and passes conformance tests
-- [x] `storage.localfs` exists and is mandatory baseline
+- [x] LocalFS CAS exists and is mandatory baseline (plugin)
 - [x] resolver supports CID-hydration using CAS deterministically
 - [x] API boundary models are explicit (request/response/errors)
 - [x] documentation states IPFS is optional transport, not dependency

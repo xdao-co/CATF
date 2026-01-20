@@ -61,9 +61,14 @@ This only computes the CID; it does not store bytes anywhere.
 CATF integrations frequently pass around *CIDs* (for policies and attestations) rather than always moving bytes.
 When you do that, you MUST provide a **content-addressable store (CAS)** that can hydrate bytes by CID.
 
-The core library expresses this as a small interface (`xdao.co/catf/storage.CAS`) and ships an offline reference implementation:
+The core library expresses this as a small interface (`xdao.co/catf/storage.CAS`).
 
-- Local filesystem CAS: `xdao.co/catf/storage/localfs`
+CAS backends are provided as **plugins** (separate Go modules) and are linked into your binary via blank imports.
+
+Reference plugins:
+
+- Local filesystem CAS: `xdao.co/catf-localfs/localfs`
+- IPFS repo CAS (Kubo CLI adapter): `xdao.co/catf-ipfs/ipfs`
 
 It also ships an optional **CAS gRPC transport** layer that can expose any `storage.CAS` implementation over a gRPC boundary:
 
@@ -135,11 +140,11 @@ If you want to consult multiple stores (e.g., local first, then optional transpo
 Adapter ordering is slice order (deterministic).
 
 ```go
+// In your binary, link the plugins you want (blank imports), then open them.
+// See "Runtime selection via config" below for a config-driven approach.
+
 local, _ := localfs.New("/var/lib/xdao/cas")
 ipfsCAS := ipfs.New(ipfs.Options{}) // optional (defaults to pin=true)
-
-// To explicitly disable pinning:
-// ipfsCAS := ipfs.New(ipfs.Options{Pin: ipfs.Bool(false)})
 
 cas := storage.MultiCAS{Adapters: []storage.CAS{local, ipfsCAS}}
 ```
@@ -150,13 +155,11 @@ Note: writes go to the first adapter only; reads try adapters in order.
 
 IPFS is an optional transport/pinning layer for exchanging blocks with other peers. It is not required to use CATF.
 
-If you want to store bytes in a local IPFS repo (no daemon required):
+If you want to store bytes in a local IPFS repo (no daemon required), use the CAS tooling (`xdao-cascli`) with the IPFS plugin backend:
 
 ```sh
-./bin/xdao-catf ipfs put --init ./path/to/subject.bin
+./bin/xdao-cascli put --backend ipfs --ipfs-path ~/.ipfs ./path/to/subject.bin
 ```
-
-This writes a raw block to the local IPFS repo (via `ipfs block put`) and prints the CID.
 
 If you intend other peers to fetch the content, you need a network-facing node (or pinning layer):
 
@@ -166,8 +169,38 @@ If you intend other peers to fetch the content, you need a network-facing node (
 
 Optional tests:
 
-- The `xdao.co/catf/storage/ipfs` adapter includes a conformance test that is skipped by default.
-- Run it locally with `XDAO_TEST_IPFS=1 go -C src test ./...` (requires `ipfs` on `PATH`).
+- The `xdao.co/catf-ipfs/ipfs` plugin includes a conformance test that is skipped by default.
+- Run it locally with `XDAO_TEST_IPFS=1 go test ./...` in the plugin repo (requires `ipfs` on `PATH`).
+
+### Runtime selection via config ("inject" plugins at runtime)
+
+Go does not dynamically load Go modules at runtime in this project.
+"Injection" here means:
+
+1) you link one or more CAS plugins into your binary (blank imports), and
+2) you select/compose them at runtime via a JSON config file.
+
+The reference config loader is `xdao.co/catf/storage/casconfig`.
+
+Example config:
+
+```json
+{
+  "write_policy": "all",
+  "backends": [
+    {"name": "localfs", "config": {"localfs-dir": "/var/lib/xdao/cas"}},
+    {"name": "ipfs", "config": {"ipfs-path": "/var/lib/xdao/ipfs", "pin": "true"}}
+  ]
+}
+```
+
+In Go:
+
+```go
+cfg, _ := casconfig.LoadFile("/path/to/cas.json")
+cas, closeFn, _ := cfg.Open(casregistry.UsageCLI, "localfs")
+defer closeFn()
+```
 
 ---
 

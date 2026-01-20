@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -11,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -41,8 +39,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return cmdCROF(args[1:], out, errOut)
 	case "doc-cid":
 		return cmdDocCID(args[1:], out, errOut)
-	case "ipfs":
-		return cmdIPFS(args[1:], out, errOut)
 	case "key":
 		return cmdKey(args[1:], out, errOut)
 	case "resolve":
@@ -66,7 +62,6 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  xdao-catf crof cid <file>")
 	fmt.Fprintln(w, "  xdao-catf crof validate-supersession --new <file> --old <file>")
 	fmt.Fprintln(w, "  xdao-catf doc-cid <file>")
-	fmt.Fprintln(w, "  xdao-catf ipfs put [--pin] [--init] <file>")
 	fmt.Fprintln(w, "  xdao-catf key init --name <name> [--seed-hex <64hex>] [--force]")
 	fmt.Fprintln(w, "  xdao-catf key derive --from <name> --role <role> [--force]")
 	fmt.Fprintln(w, "  xdao-catf key list")
@@ -78,11 +73,6 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "Notes:")
 	fmt.Fprintln(w, "  - --seed-hex must be 32 bytes (64 hex chars) ed25519 seed")
 	fmt.Fprintln(w, "  - KMS-lite stores keys under ~/.xdao/keys/<name> (0600 private key files)")
-	fmt.Fprintln(w, "  - ipfs put stores raw bytes in your local IPFS repo and prints the CID")
-	fmt.Fprintln(w, "  - IPFS smoke test:")
-	fmt.Fprintln(w, "      CID=$(xdao-catf ipfs put --init <file>)")
-	fmt.Fprintln(w, "      xdao-catf doc-cid <file>  # should match CID")
-	fmt.Fprintln(w, "      ipfs block get $CID > /tmp/out && cmp <file> /tmp/out")
 	fmt.Fprintln(w, "  - approval attestations require Effective-Date (provide --effective-date or --claim Effective-Date=...)")
 	fmt.Fprintln(w, "  - attest writes canonical CATF bytes to stdout (no trailing newline)")
 	fmt.Fprintln(w, "  - resolve/resolve-name print canonical CROF to stdout")
@@ -151,143 +141,6 @@ func cmdCROF(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintf(errOut, "unknown crof subcommand: %s\n", args[0])
 		return 2
 	}
-}
-
-func cmdIPFS(args []string, out io.Writer, errOut io.Writer) int {
-	if len(args) == 0 {
-		fmt.Fprintln(errOut, "usage: xdao-catf ipfs <subcommand> ...")
-		fmt.Fprintln(errOut, "subcommands: put")
-		return 2
-	}
-	switch args[0] {
-	case "put":
-		return cmdIPFSPut(args[1:], out, errOut)
-	default:
-		fmt.Fprintf(errOut, "unknown ipfs subcommand: %s\n", args[0])
-		return 2
-	}
-}
-
-func cmdIPFSPut(args []string, out io.Writer, errOut io.Writer) int {
-	fs := flag.NewFlagSet("ipfs put", flag.ContinueOnError)
-	fs.SetOutput(errOut)
-
-	var pin bool
-	var initRepo bool
-	var allowMismatch bool
-	fs.BoolVar(&pin, "pin", true, "Pin the block in the local IPFS repo")
-	fs.BoolVar(&initRepo, "init", false, "Initialize ~/.ipfs if missing (runs 'ipfs init')")
-	fs.BoolVar(&allowMismatch, "allow-mismatch", false, "Print CID even if it does not match doc-cid")
-
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-	if fs.NArg() != 1 {
-		fmt.Fprintln(errOut, "usage: xdao-catf ipfs put [--pin] [--init] <file>")
-		return 2
-	}
-	path := fs.Arg(0)
-
-	if _, err := exec.LookPath("ipfs"); err != nil {
-		fmt.Fprintln(errOut, "ipfs not found on PATH (install Kubo 'ipfs' CLI)")
-		return 1
-	}
-
-	b, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintf(errOut, "read %s: %v\n", filepath.Base(path), err)
-		return 1
-	}
-	expectedCID := cidutil.CIDv1RawSHA256(b)
-	if expectedCID == "" {
-		fmt.Fprintln(errOut, "failed to compute CID")
-		return 1
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Fprintf(errOut, "home dir: %v\n", err)
-		return 1
-	}
-	repoDir := filepath.Join(home, ".ipfs")
-	if _, statErr := os.Stat(repoDir); statErr != nil {
-		if !errors.Is(statErr, os.ErrNotExist) {
-			fmt.Fprintf(errOut, "stat ~/.ipfs: %v\n", statErr)
-			return 1
-		}
-		if !initRepo {
-			fmt.Fprintln(errOut, "IPFS repo not found at ~/.ipfs")
-			fmt.Fprintln(errOut, "Run: ipfs init")
-			fmt.Fprintln(errOut, "Or:  xdao-catf ipfs put --init <file>")
-			return 2
-		}
-		cmd := exec.Command("ipfs", "init")
-		cmd.Stdout = errOut
-		cmd.Stderr = errOut
-		if runErr := cmd.Run(); runErr != nil {
-			fmt.Fprintf(errOut, "ipfs init: %v\n", runErr)
-			return 1
-		}
-	}
-
-	// Store the raw bytes as a raw block so the returned CID matches doc-cid.
-	// Different Kubo versions use different flag names; try a couple.
-	base := []string{"block", "put"}
-	if pin {
-		base = append(base, "--pin")
-	}
-	variants := [][]string{
-		append(append([]string{}, base...), "--cid-codec=raw", "--mhtype=sha2-256", path),
-		append(append([]string{}, base...), "--format=raw", "--mhtype=sha2-256", path),
-		append(append([]string{}, base...), "--cid-version=1", "--format=raw", "--mhtype=sha2-256", path),
-	}
-
-	var lastErr error
-	var stdout, stderr string
-	var actualCID string
-	for _, argv := range variants {
-		cmd := exec.Command("ipfs", argv...)
-		var outBuf, errBuf bytes.Buffer
-		cmd.Stdout = &outBuf
-		cmd.Stderr = &errBuf
-		runErr := cmd.Run()
-		stdout = strings.TrimSpace(outBuf.String())
-		stderr = strings.TrimSpace(errBuf.String())
-		if runErr != nil {
-			lastErr = fmt.Errorf("ipfs %s: %v", strings.Join(argv, " "), runErr)
-			continue
-		}
-		// Output is usually the CID; if extra text appears, take first token.
-		fields := strings.Fields(stdout)
-		if len(fields) == 0 {
-			lastErr = fmt.Errorf("ipfs %s: empty output", strings.Join(argv, " "))
-			continue
-		}
-		actualCID = fields[0]
-		lastErr = nil
-		break
-	}
-	if lastErr != nil {
-		if stderr != "" {
-			fmt.Fprintf(errOut, "%v\n%s\n", lastErr, stderr)
-			return 1
-		}
-		fmt.Fprintf(errOut, "%v\n", lastErr)
-		return 1
-	}
-
-	if actualCID != expectedCID {
-		fmt.Fprintf(errOut, "warning: ipfs returned CID does not match doc-cid\n")
-		fmt.Fprintf(errOut, "  doc-cid: %s\n", expectedCID)
-		fmt.Fprintf(errOut, "  ipfs:    %s\n", actualCID)
-		if !allowMismatch {
-			fmt.Fprintln(errOut, "refusing to continue without --allow-mismatch")
-			return 1
-		}
-	}
-
-	_, _ = fmt.Fprintln(out, actualCID)
-	return 0
 }
 
 type stringList []string

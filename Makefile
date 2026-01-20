@@ -1,4 +1,4 @@
-.PHONY: help all build build-cascli build-casgrpcd clean test test-unit test-integration fmt vet regen-conformance examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs walkthrough walkthrough-localfs walkthrough-ipfs walkthrough-grpc walkthrough-grpc-localfs walkthrough-grpc-ipfs
+.PHONY: help all build build-cascli build-casgrpcd clean test test-unit test-integration fmt vet regen-conformance examples examples-ipfs example-uc1 example-uc2 example-uc3 example-uc4 example-uc1-ipfs example-uc2-ipfs example-uc3-ipfs example-uc4-ipfs walkthrough walkthrough-all walkthrough-localfs walkthrough-ipfs walkthrough-grpc walkthrough-grpc-localfs walkthrough-grpc-ipfs
 
 SHELL := /bin/bash
 
@@ -31,6 +31,7 @@ help:
 	@echo "  example-uc3-ipfs Like example-uc3, but with XDAO_USE_IPFS=1"
 	@echo "  example-uc4-ipfs Like example-uc4, but with XDAO_USE_IPFS=1"
 	@echo "  walkthrough      Run storage walkthroughs (localfs + ipfs)"
+	@echo "  walkthrough-all  Store subject+policy+attestations+CROF in localfs + ipfs (write_policy=all)"
 	@echo "  walkthrough-localfs Store subject+policy+attestations+CROF in localfs CAS"
 	@echo "  walkthrough-ipfs Store subject+policy+attestations+CROF in local IPFS repo"
 	@echo "  walkthrough-grpc Run storage walkthroughs via CAS gRPC (localfs + ipfs)"
@@ -100,6 +101,9 @@ example-uc4-ipfs: build
 	XDAO_USE_IPFS=1 bash examples/usecase4_kms_lite_key_management.sh
 
 walkthrough: walkthrough-localfs walkthrough-ipfs
+
+walkthrough-all: build build-cascli
+	bash examples/walkthrough_all.sh
 
 walkthrough-localfs: build build-cascli
 	bash examples/walkthrough_localfs.sh

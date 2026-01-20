@@ -10,6 +10,8 @@ if [[ ! -x "$XDAO_CATF_BIN" ]]; then
   exit 1
 fi
 
+XDAO_CASCLI_BIN="$REPO_ROOT/bin/xdao-cascli"
+
 HOME_DIR="$(mktemp -d /tmp/xdao-home.XXXXXX)"
 export HOME="$HOME_DIR"
 
@@ -26,7 +28,19 @@ echo "Alice signing key: $ALICE_SIGNING_KEY" >&2
 # Export the signing public key to a file and treat it as a subject.
 "$XDAO_CATF_BIN" key export --name alice --role signing > /tmp/alice-signing.pub
 if [[ -n "${XDAO_USE_IPFS:-}" ]]; then
-  KEY_SUBJECT_CID="$("$XDAO_CATF_BIN" ipfs put --init /tmp/alice-signing.pub)"
+  if [[ ! -x "$XDAO_CASCLI_BIN" ]]; then
+    echo "Missing $XDAO_CASCLI_BIN" >&2
+    echo "Run: make build" >&2
+    exit 1
+  fi
+
+  if ! command -v ipfs >/dev/null 2>&1; then
+    echo "ipfs not found on PATH (install Kubo 'ipfs' CLI)" >&2
+    exit 1
+  fi
+  ipfs init >/dev/null
+
+  KEY_SUBJECT_CID="$("$XDAO_CASCLI_BIN" put --backend ipfs --ipfs-path "$HOME/.ipfs" /tmp/alice-signing.pub)"
 else
   KEY_SUBJECT_CID="$("$XDAO_CATF_BIN" doc-cid /tmp/alice-signing.pub)"
 fi

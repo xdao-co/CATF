@@ -38,6 +38,12 @@ Build and run the local filesystem walkthrough:
 make walkthrough-localfs
 ```
 
+Run the combined localfs+ipfs walkthrough using a single config (replicate writes to both backends; optional; requires Kubo `ipfs`):
+
+```sh
+make walkthrough-all
+```
+
 Run the IPFS walkthrough (optional):
 
 ```sh
@@ -66,6 +72,57 @@ Run both gRPC variants:
 
 ```sh
 make walkthrough-grpc
+```
+
+---
+
+## Runtime backend injection via config (plugins)
+
+CATF uses a lightweight CAS plugin registry (`storage/casregistry`).
+Backends are linked into the binaries (blank imports), then selected/composed at runtime.
+
+Both `xdao-cascli` and `xdao-casgrpcd` accept `--cas-config` to open backends from a JSON file.
+
+### Config: localfs only
+
+```json
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "localfs", "config": {"localfs-dir": "/tmp/xdao-cas"}}
+  ]
+}
+```
+
+### Config: ipfs only
+
+```json
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "ipfs", "config": {"ipfs-path": "/tmp/xdao-ipfs", "pin": "true"}}
+  ]
+}
+```
+
+### Config: all backends (replicate writes)
+
+Example config (replicate writes to *both* localfs and ipfs):
+
+```json
+{
+  "write_policy": "all",
+  "backends": [
+    {"name": "localfs", "config": {"localfs-dir": "/tmp/xdao-cas"}},
+    {"name": "ipfs", "config": {"ipfs-path": "/tmp/xdao-ipfs", "pin": "true"}}
+  ]
+}
+```
+
+Write a file and print "CID multiples" (per-backend CID map) as JSON:
+
+```sh
+./bin/xdao-cascli put --cas-config ./cas.json --emit-backend-cids ./examples/whitepaper.txt
 ```
 
 ---
@@ -111,6 +168,7 @@ If everything worked, the script ends with:
 
 - LocalFS walkthrough script: `examples/walkthrough_localfs.sh`
 - IPFS walkthrough script: `examples/walkthrough_ipfs.sh`
+- LocalFS+IPFS (replicating) walkthrough script: `examples/walkthrough_all.sh`
 - LocalFS-via-gRPC walkthrough script: `examples/walkthrough_grpccas_localfs.sh`
 - IPFS-via-gRPC walkthrough script: `examples/walkthrough_grpccas_ipfs.sh`
 

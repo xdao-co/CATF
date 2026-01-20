@@ -37,9 +37,11 @@ Prohibited in a resolver step:
 
 If Flux passes policy/attestation inputs by CID (common for large artifacts), you MUST provide a **CAS** implementation capable of hydrating bytes by CID.
 
-The core library expresses this as `xdao.co/catf/storage.CAS` and provides an offline baseline implementation:
+The core library expresses this as `xdao.co/catf/storage.CAS`.
 
-- `xdao.co/catf/storage/localfs` (write-once, immutable, CID-keyed)
+Reference CAS implementations are delivered as **plugins** (separate Go modules) and linked into your Flux worker binary as dependencies:
+
+- LocalFS plugin: `xdao.co/catf-localfs/localfs` (write-once, immutable, CID-keyed)
 
 Design notes:
 
@@ -55,7 +57,7 @@ Sketch:
 
 ```go
 local, _ := localfs.New("/var/lib/flux/cas")
-// transport := ipfs.New(ipfs.Options{}) // optional adapter (defaults to pin=true)
+// transport := ipfs.New(ipfs.Options{}) // optional adapter (from xdao.co/catf-ipfs/ipfs; defaults to pin=true)
 
 // To disable pinning:
 // transport := ipfs.New(ipfs.Options{Pin: ipfs.Bool(false)})

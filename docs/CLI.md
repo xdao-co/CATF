@@ -120,52 +120,23 @@ cd ./src
 SUBJECT_CID="$(go run ./cmd/xdao-catf doc-cid ../examples/whitepaper.txt)"
 ```
 
-### `ipfs put` (local publish, no daemon required)
+### IPFS + CAS storage
 
 `doc-cid` only computes the CID; it does not store bytes anywhere.
 
-IPFS usage is optional. CATF/CROF workflows work fully offline without IPFS; IPFS is one possible transport/pinning layer.
+CAS operations (put/get/resolve-by-CID) are handled by the separate CAS CLI (`xdao-cascli`), which uses plugin backends.
 
-If you have the Kubo `ipfs` CLI installed, you can store the file bytes into your **local IPFS repo** (even if `ipfs daemon` is not running) as a **raw block** so the returned CID matches `doc-cid`:
-
-```sh
-SUBJECT_CID="$(./bin/xdao-catf ipfs put --init ./examples/whitepaper.txt)"
-```
-
-Notes:
-
-- This uses `ipfs block put` under the hood (raw block, sha2-256). It is meant for “content-address the exact bytes” workflows.
-- If you want “normal IPFS files” (UnixFS DAG with chunking), that’s `ipfs add`, which will usually produce a different CID than `doc-cid`.
-- To actually serve the content to other peers, you’ll later run `ipfs daemon` (or have your XDAO Node serve/pin content).
-
-#### How to test IPFS from the CLI
-
-This is a quick smoke test that proves:
-
-1) the CID matches `doc-cid`, and
-2) the bytes are actually stored in your local IPFS repo.
-
-From the repo root (after `make build`):
+To store bytes into a local IPFS repo (no daemon required), use the IPFS CAS plugin:
 
 ```sh
-CID="$(./bin/xdao-catf ipfs put --init ./examples/whitepaper.txt)"
-echo "CID=$CID"
-
-./bin/xdao-catf doc-cid ./examples/whitepaper.txt  # should match
-
-ipfs block stat "$CID"
-ipfs block get "$CID" > /tmp/xdao-ipfs.out
-cmp ./examples/whitepaper.txt /tmp/xdao-ipfs.out
-echo "OK: local IPFS repo contains the exact bytes"
+./bin/xdao-cascli put --backend ipfs --ipfs-path ~/.ipfs ./examples/whitepaper.txt
 ```
 
-If you want to publish to the IPFS network (peers can fetch), run your node in daemon mode:
+To select backends at runtime (including multi-backend write replication), use `--cas-config`:
 
 ```sh
-ipfs daemon
+./bin/xdao-cascli put --cas-config ./cas.json --emit-backend-cids ./examples/whitepaper.txt
 ```
-
-Then ensure the content is pinned/served by that node (or by your XDAO Node’s pinning layer).
 
 ### `key` (KMS-lite)
 

@@ -30,6 +30,16 @@ CAS_DIR="$WORK_DIR/cas"
 HOME_DIR="$WORK_DIR/home"
 mkdir -p "$CAS_DIR" "$HOME_DIR"
 
+CAS_CONFIG="$WORK_DIR/cas.localfs.json"
+cat >"$CAS_CONFIG" <<EOF
+{
+  "write_policy": "first",
+  "backends": [
+    {"name": "localfs", "config": {"localfs-dir": "$CAS_DIR"}}
+  ]
+}
+EOF
+
 GRPC_LOG="$WORK_DIR/casgrpcd.log"
 GRPC_PID=""
 GRPC_ADDR=""
@@ -59,12 +69,13 @@ DOC_PATH="$REPO_ROOT/examples/whitepaper.txt"
 
 echo "Work dir: $WORK_DIR" >&2
 echo "LocalFS CAS dir: $CAS_DIR" >&2
+echo "CAS config: $CAS_CONFIG" >&2
 
 # Start a CAS gRPC daemon exposing localfs.
 "$XDAO_CASGRPCD_BIN" \
   --listen 127.0.0.1:0 \
   --backend localfs \
-  --localfs-dir "$CAS_DIR" \
+  --cas-config "$CAS_CONFIG" \
   2>"$GRPC_LOG" &
 GRPC_PID=$!
 

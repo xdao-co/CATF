@@ -8,6 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"xdao.co/catf/storage"
+	"xdao.co/catf/storage/casconfig"
 	"xdao.co/catf/storage/casregistry"
 	"xdao.co/catf/storage/grpccas"
 
@@ -19,6 +21,7 @@ func main() {
 	fs := flag.NewFlagSet("xdao-casgrpcd", flag.ExitOnError)
 	listen := fs.String("listen", "127.0.0.1:7777", "listen address")
 	backend := fs.String("backend", "localfs", "CAS backend name")
+	casConfigPath := fs.String("cas-config", "", "Path to CAS JSON config (optional; uses casregistry OpenWithConfig)")
 	listBackends := fs.Bool("list-backends", false, "List supported backends and exit")
 
 	casregistry.RegisterFlags(fs, casregistry.UsageDaemon)
@@ -35,7 +38,21 @@ func main() {
 		return
 	}
 
-	cas, closeFn, err := casregistry.Open(*backend, casregistry.UsageDaemon)
+	var (
+		cas     storage.CAS
+		closeFn func() error
+		err     error
+	)
+	if *casConfigPath != "" {
+		cfg, cfgErr := casconfig.LoadFile(*casConfigPath)
+		if cfgErr != nil {
+			fmt.Fprintln(os.Stderr, cfgErr)
+			os.Exit(2)
+		}
+		cas, closeFn, err = cfg.Open(casregistry.UsageDaemon, *backend)
+	} else {
+		cas, closeFn, err = casregistry.Open(*backend, casregistry.UsageDaemon)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
