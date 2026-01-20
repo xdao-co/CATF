@@ -5,63 +5,43 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 
 	"google.golang.org/grpc"
 
-	"xdao.co/catf/storage"
+	"xdao.co/catf/storage/casregistry"
 	"xdao.co/catf/storage/grpccas"
-	"xdao.co/catf/storage/ipfs"
-	"xdao.co/catf/storage/localfs"
+
+	_ "xdao.co/catf-ipfs/ipfs"
+	_ "xdao.co/catf-localfs/localfs"
 )
 
 func main() {
 	fs := flag.NewFlagSet("xdao-casgrpcd", flag.ExitOnError)
 	listen := fs.String("listen", "127.0.0.1:7777", "listen address")
-	backend := fs.String("backend", "localfs", "CAS backend: localfs|ipfs")
+	backend := fs.String("backend", "localfs", "CAS backend name")
+	listBackends := fs.Bool("list-backends", false, "List supported backends and exit")
 
-	localDir := fs.String("localfs-dir", "", "LocalFS CAS directory (for --backend=localfs)")
-
-	ipfsPath := fs.String("ipfs-path", "", "IPFS repo path (sets IPFS_PATH; for --backend=ipfs)")
-	ipfsBin := fs.String("ipfs-bin", "", "Path to ipfs binary (optional; defaults to 'ipfs')")
-	pin := fs.Bool("pin", true, "Pin blocks when writing (for --backend=ipfs)")
+	casregistry.RegisterFlags(fs, casregistry.UsageDaemon)
 
 	_ = fs.Parse(os.Args[1:])
-
-	var cas storage.CAS
-	switch *backend {
-	case "localfs":
-		if *localDir == "" {
-			fmt.Fprintln(os.Stderr, "missing --localfs-dir")
-			os.Exit(2)
+	if *listBackends {
+		for _, b := range casregistry.List(casregistry.UsageDaemon) {
+			if b.Description == "" {
+				_, _ = fmt.Fprintf(os.Stdout, "%s\n", b.Name)
+				continue
+			}
+			_, _ = fmt.Fprintf(os.Stdout, "%s\t%s\n", b.Name, b.Description)
 		}
-		c, err := localfs.New(*localDir)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		cas = c
+		return
+	}
 
-	case "ipfs":
-		bin := *ipfsBin
-		if bin == "" {
-			bin = "ipfs"
-		}
-		if _, err := exec.LookPath(bin); err != nil {
-			fmt.Fprintf(os.Stderr, "ipfs not found on PATH (or at --ipfs-bin): %v\n", err)
-			os.Exit(1)
-		}
-
-		env := os.Environ()
-		if *ipfsPath != "" {
-			env = append(env, "IPFS_PATH="+*ipfsPath)
-		}
-
-		cas = ipfs.New(ipfs.Options{Bin: bin, Env: env, Pin: ipfs.Bool(*pin)})
-
-	default:
-		fmt.Fprintln(os.Stderr, "invalid --backend")
+	cas, closeFn, err := casregistry.Open(*backend, casregistry.UsageDaemon)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
+	}
+	if closeFn != nil {
+		defer closeFn()
 	}
 
 	lis, err := net.Listen("tcp", *listen)

@@ -15,9 +15,9 @@ import (
 	"xdao.co/catf/storage"
 	"xdao.co/catf/storage/casregistry"
 
+	_ "xdao.co/catf-ipfs/ipfs"
+	_ "xdao.co/catf-localfs/localfs"
 	_ "xdao.co/catf/storage/grpccas"
-	_ "xdao.co/catf/storage/ipfs"
-	_ "xdao.co/catf/storage/localfs"
 )
 
 func main() {

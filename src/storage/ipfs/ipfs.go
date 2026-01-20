@@ -1,3 +1,6 @@
+//go:build removed
+// +build removed
+
 package ipfs
 
 import (

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,15 +14,10 @@ import (
 	"xdao.co/catf/cidutil"
 	"xdao.co/catf/storage"
 	"xdao.co/catf/storage/bundle"
-	"xdao.co/catf/storage/localfs"
 )
 
 func TestBundle_ExportIsDeterministic(t *testing.T) {
-	dir := t.TempDir()
-	cas, err := localfs.New(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cas := newMemCAS()
 
 	id1, err := cas.Put([]byte("hello"))
 	if err != nil {
@@ -47,11 +43,7 @@ func TestBundle_ExportIsDeterministic(t *testing.T) {
 }
 
 func TestBundle_ImportRoundTrip(t *testing.T) {
-	srcDir := t.TempDir()
-	src, err := localfs.New(srcDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	src := newMemCAS()
 
 	payload := []byte("payload")
 	id, err := src.Put(payload)
@@ -64,11 +56,7 @@ func TestBundle_ImportRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dstDir := t.TempDir()
-	dst, err := localfs.New(dstDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	dst := newMemCAS()
 
 	if err := bundle.Import(bytes.NewReader(buf.Bytes()), dst); err != nil {
 		t.Fatal(err)
@@ -100,11 +88,7 @@ func TestBundle_ImportRejectsCIDMismatch(t *testing.T) {
 	// Name says "otherCID" but bytes are "good" => computed CID mismatch.
 	bundleBytes := makeDeterministicTar(t, "blocks/"+otherCID.String(), good)
 
-	dstDir := t.TempDir()
-	dst, err := localfs.New(dstDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	dst := newMemCAS()
 
 	if err := bundle.Import(bytes.NewReader(bundleBytes), dst); err != storage.ErrCIDMismatch {
 		t.Fatalf("expected ErrCIDMismatch, got %v", err)
@@ -123,11 +107,7 @@ func TestBundle_ImportRejectsDuplicateBlockEntry(t *testing.T) {
 		{name: "blocks/" + id.String(), content: payload},
 	})
 
-	dstDir := t.TempDir()
-	dst, err := localfs.New(dstDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	dst := newMemCAS()
 
 	err = bundle.Import(bytes.NewReader(b), dst)
 	if err == nil {
@@ -151,11 +131,7 @@ func TestBundle_ImportFailsClosedOnUnknownEntry(t *testing.T) {
 		{name: "blocks/" + id.String(), content: payload},
 	})
 
-	dstDir := t.TempDir()
-	dst, err := localfs.New(dstDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	dst := newMemCAS()
 
 	err = bundle.Import(bytes.NewReader(b), dst)
 	if err == nil {
@@ -179,11 +155,7 @@ func TestBundle_ImportAllowsUnknownEntriesWhenOptionSet(t *testing.T) {
 		{name: "blocks/" + id.String(), content: payload},
 	})
 
-	dstDir := t.TempDir()
-	dst, err := localfs.New(dstDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	dst := newMemCAS()
 
 	if err := bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{UnknownEntryPolicy: bundle.UnknownEntryPolicyIgnore}); err != nil {
 		t.Fatal(err)
@@ -200,14 +172,9 @@ func TestBundle_ImportAllowsUnknownEntriesWhenOptionSet(t *testing.T) {
 
 func TestBundle_ImportRejectsTraversalPath(t *testing.T) {
 	b := makeDeterministicTarEntries(t, []tarEntry{{name: "../evil", content: []byte("nope")}})
+	dst := newMemCAS()
 
-	dstDir := t.TempDir()
-	dst, err := localfs.New(dstDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{UnknownEntryPolicy: bundle.UnknownEntryPolicyIgnore})
+	err := bundle.ImportWithOptions(bytes.NewReader(b), dst, bundle.ImportOptions{UnknownEntryPolicy: bundle.UnknownEntryPolicyIgnore})
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -217,11 +184,7 @@ func TestBundle_ImportRejectsTraversalPath(t *testing.T) {
 }
 
 func TestBundle_ExportTarOrderingAndHeaders(t *testing.T) {
-	dir := t.TempDir()
-	cas, err := localfs.New(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cas := newMemCAS()
 
 	id1, err := cas.Put([]byte("a"))
 	if err != nil {
@@ -317,4 +280,68 @@ func makeDeterministicTarEntries(t *testing.T, entries []tarEntry) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+type memCAS struct {
+	mu sync.RWMutex
+	m  map[string][]byte
+}
+
+func newMemCAS() *memCAS {
+	return &memCAS{m: map[string][]byte{}}
+}
+
+func (c *memCAS) Put(b []byte) (cid.Cid, error) {
+	id, err := cidutil.CIDv1RawSHA256CID(b)
+	if err != nil {
+		return cid.Undef, err
+	}
+	if !id.Defined() {
+		return cid.Undef, storage.ErrInvalidCID
+	}
+	k := id.String()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if existing, ok := c.m[k]; ok {
+		if string(existing) != string(b) {
+			return cid.Undef, storage.ErrImmutable
+		}
+		return id, nil
+	}
+	c.m[k] = append([]byte(nil), b...)
+	return id, nil
+}
+
+func (c *memCAS) Get(id cid.Cid) ([]byte, error) {
+	if !id.Defined() {
+		return nil, storage.ErrInvalidCID
+	}
+	k := id.String()
+	c.mu.RLock()
+	b, ok := c.m[k]
+	c.mu.RUnlock()
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	out := append([]byte(nil), b...)
+	got, err := cidutil.CIDv1RawSHA256CID(out)
+	if err != nil {
+		return nil, err
+	}
+	if got != id {
+		return nil, storage.ErrCIDMismatch
+	}
+	return out, nil
+}
+
+func (c *memCAS) Has(id cid.Cid) bool {
+	if !id.Defined() {
+		return false
+	}
+	k := id.String()
+	c.mu.RLock()
+	_, ok := c.m[k]
+	c.mu.RUnlock()
+	return ok
 }
