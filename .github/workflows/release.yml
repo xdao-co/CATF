@@ -52,26 +52,14 @@ jobs:
             fail-fast: false
             matrix:
                 include:
-                    - goos: linux
-                      goarch: amd64
-                      ext: ""
-                      archive_ext: tar.gz
-                    - goos: linux
-                      goarch: arm64
-                      ext: ""
-                      archive_ext: tar.gz
-                    - goos: darwin
-                      goarch: amd64
-                      ext: ""
-                      archive_ext: tar.gz
                     - goos: darwin
                       goarch: arm64
                       ext: ""
                       archive_ext: tar.gz
-                    - goos: windows
+                    - goos: linux
                       goarch: amd64
-                      ext: .exe
-                      archive_ext: zip
+                      ext: ""
+                      archive_ext: tar.gz
 
         steps:
             - name: Checkout
