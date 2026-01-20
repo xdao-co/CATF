@@ -89,8 +89,8 @@ jobs:
                   out="dist/xdao-catf_${RELEASE_TAG}_${GOOS}_${GOARCH}${{ matrix.ext }}"
                   go -C src build -trimpath -ldflags='-s -w' -o "../${out}" ./cmd/xdao-catf
 
-                  # Smoke check (skip on Windows cross-build)
-                  if [[ "${GOOS}" != "windows" ]]; then
+                  # Smoke check only when the produced binary is runnable on the Ubuntu runner.
+                  if [[ "${GOOS}" == "linux" && "${GOARCH}" == "amd64" ]]; then
                     "./${out}" --help >/dev/null
                   fi
 
